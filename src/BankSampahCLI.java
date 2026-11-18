@@ -1,3 +1,4 @@
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Scanner;
 
@@ -143,11 +144,21 @@ public class BankSampahCLI {
                 return;
             }
             Penarikan penarikan = bank.tarikSaldo(idNasabah, jumlah);
+            double saldoSisa = bank.cariNasabah(idNasabah).getSaldo();
+            Path struk = null;
+            try {
+                struk = bank.buatStrukTransfer(nasabah, penarikan, saldoSisa);
+            } catch (Exception ex) {
+                System.out.println("Catatan: gagal menyimpan struk (" + ex.getMessage() + ")");
+            }
             System.out.println("Pencairan berhasil diproses!");
             System.out.println("No. Referensi : " + penarikan.getNoReferensi());
             System.out.println("Tujuan        : " + nasabah.getTujuanTransfer());
             System.out.println("Jumlah        : " + Format.rupiah(penarikan.getJumlah()));
-            System.out.println("Saldo sekarang: " + Format.rupiah(bank.cariNasabah(idNasabah).getSaldo()));
+            System.out.println("Saldo sekarang: " + Format.rupiah(saldoSisa));
+            if (struk != null) {
+                System.out.println("Struk tersimpan: " + struk.toAbsolutePath());
+            }
         } catch (IllegalArgumentException e) {
             System.out.println("Gagal mencairkan saldo: " + e.getMessage());
         }
@@ -185,7 +196,7 @@ public class BankSampahCLI {
     private static void tampilkanDaftarSampah() {
         System.out.println("Jenis sampah tersedia:");
         for (Sampah sampah : bank.getDaftarSampah()) {
-            System.out.println("- " + sampah.getNama() + " (" + Format.rupiah(sampah.getHargaPerKg()) + "/kg)");
+            System.out.println("- " + sampah.getNama() + " (" + Format.rupiah(sampah.getHargaPerKg()) + "/kg, " + sampah.getKategori() + ")");
         }
     }
 

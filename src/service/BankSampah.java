@@ -22,6 +22,7 @@ import model.Organik;
 import model.Penarikan;
 import model.Plastik;
 import model.Sampah;
+import model.SampahKustom;
 import model.Setoran;
 import model.Transaksi;
 import util.Format;
@@ -33,6 +34,8 @@ public class BankSampah {
     private static final Path SETORAN_FILE = DATA_DIR.resolve("setoran.csv");
     private static final Path PENARIKAN_FILE = DATA_DIR.resolve("penarikan.csv");
     private static final Path COUNTER_FILE = DATA_DIR.resolve("counters.properties");
+    private static final Path SAMPAH_FILE = DATA_DIR.resolve("sampah.csv");
+    private static final Path STRUK_DIR = Paths.get("struk");
 
     private final List<Nasabah> daftarNasabah;
     private final List<Sampah> daftarSampah;
@@ -41,20 +44,38 @@ public class BankSampah {
     private int counterPenarikan;
 
     public BankSampah() {
-        daftarNasabah = new ArrayList<>();
-        daftarSampah = new ArrayList<>();
+        daftarNasabah = new ArrayList<Nasabah>();
+        daftarSampah = new ArrayList<Sampah>();
         counterNasabah = 1;
         counterTransaksi = 1;
         counterPenarikan = 1;
-        seedJenisSampah();
+        muatAtauSeedSampah();
         muatData();
     }
 
     private void seedJenisSampah() {
+        daftarSampah.clear();
         daftarSampah.add(new Plastik(4000));
         daftarSampah.add(new Kertas(2500));
         daftarSampah.add(new Logam(12000));
         daftarSampah.add(new Organik(1000));
+    }
+
+    private void muatAtauSeedSampah() {
+        if (Files.exists(SAMPAH_FILE)) {
+            try {
+                muatSampah();
+                if (daftarSampah.isEmpty()) {
+                    seedJenisSampah();
+                    simpanSampah();
+                }
+                return;
+            } catch (Exception e) {
+                System.err.println("Gagal memuat data sampah: " + e.getMessage());
+            }
+        }
+        seedJenisSampah();
+        simpanSampahQuiet();
     }
 
     public Nasabah tambahNasabah(String nama, String alamat, String noHp, String bankEwallet, String noRekening) {
@@ -63,6 +84,38 @@ public class BankSampah {
         daftarNasabah.add(nasabah);
         simpanData();
         return nasabah;
+    }
+
+    public Sampah tambahJenisSampah(String nama, double hargaPerKg, String kategori, String aturan) {
+        if (nama == null || nama.trim().isEmpty()) {
+            throw new IllegalArgumentException("Nama jenis sampah tidak boleh kosong.");
+        }
+        if (hargaPerKg <= 0) {
+            throw new IllegalArgumentException("Harga per kg harus lebih dari 0.");
+        }
+        String namaTrim = nama.trim();
+        try {
+            cariSampah(namaTrim);
+            throw new IllegalArgumentException("Jenis sampah '" + namaTrim + "' sudah ada.");
+        } catch (IllegalArgumentException e) {
+            if (e.getMessage() != null && e.getMessage().contains("sudah ada")) throw e;
+        }
+        String kat = (kategori == null || kategori.trim().isEmpty()) ? "Lainnya" : kategori.trim();
+        String at = aturan == null ? "NORMAL" : aturan.trim().toUpperCase();
+        if (!"BONUS5".equals(at) && !"BONUS5_MIN10".equals(at)) at = "NORMAL";
+        SampahKustom sampah = new SampahKustom(namaTrim, hargaPerKg, kat, at);
+        daftarSampah.add(sampah);
+        simpanSampahQuiet();
+        return sampah;
+    }
+
+    public void updateHargaSampah(String nama, double hargaPerKg) {
+        if (hargaPerKg <= 0) {
+            throw new IllegalArgumentException("Harga per kg harus lebih dari 0.");
+        }
+        Sampah sampah = cariSampah(nama);
+        sampah.setHargaPerKg(hargaPerKg);
+        simpanSampahQuiet();
     }
 
     public List<Nasabah> getDaftarNasabah() {
@@ -117,6 +170,110 @@ public class BankSampah {
         return penarikan;
     }
 
+    public Path buatStrukTransfer(Nasabah nasabah, Penarikan penarikan, double saldoSisa) {
+        try {
+            if (!Files.exists(STRUK_DIR)) {
+                Files.createDirectories(STRUK_DIR);
+            }
+            Path file = STRUK_DIR.resolve("Struk_" + penarikan.getNoReferensi() + ".txt");
+            try (BufferedWriter w = Files.newBufferedWriter(file, StandardCharsets.UTF_8)) {
+                w.write("========================================"); w.newLine();
+                w.write("      BUKTI PENCAIRAN SALDO DIGITAL     "); w.newLine();
+                w.write("           BANK SAMPAH DIGITAL          "); w.newLine();
+                w.write("========================================"); w.newLine();
+                w.write("No. Referensi : " + penarikan.getNoReferensi()); w.newLine();
+                w.write("Waktu         : " + penarikan.getWaktuFormatted()); w.newLine();
+                w.write("Nasabah       : " + nasabah.getNama() + " (" + nasabah.getId() + ")"); w.newLine();
+                w.write("Tujuan        : " + nasabah.getTujuanTransfer()); w.newLine();
+                w.write("Jumlah        : " + Format.rupiah(penarikan.getJumlah())); w.newLine();
+                w.write("Saldo Sisa    : " + Format.rupiah(saldoSisa)); w.newLine();
+                w.write("----------------------------------------"); w.newLine();
+                w.write("Status        : BERHASIL (Transfer Digital)"); w.newLine();
+                w.write("========================================"); w.newLine();
+                w.write("Simpan bukti ini sebagai arsip transaksi."); w.newLine();
+            }
+            return file;
+        } catch (IOException e) {
+            throw new RuntimeException("Gagal menyimpan struk transfer: " + e.getMessage(), e);
+        }
+    }
+
+    public void exportRiwayatCsv(Path file) throws IOException {
+        try (BufferedWriter w = Files.newBufferedWriter(file, StandardCharsets.UTF_8)) {
+            w.write("ID/Ref,Waktu,ID Nasabah,Nama Nasabah,Tipe,Deskripsi,Jumlah,Berat(kg),Kategori,Saldo Dampak");
+            w.newLine();
+            for (Nasabah n : daftarNasabah) {
+                for (Transaksi t : n.getRiwayat()) {
+                    boolean setoran = t.getKategoriSampah() != null;
+                    String tipe = setoran ? "Setoran" : "Pencairan/Transfer";
+                    String jumlah = String.format(Locale.US, "%.2f", t.getJumlah());
+                    String berat = setoran ? String.format(Locale.US, "%.4f", t.getBeratKg()) : "";
+                    String kategori = setoran ? safeCsv(t.getKategoriSampah()) : "";
+                    w.write(String.join(",",
+                            csv(t.getId()),
+                            csv(t.getWaktuFormatted()),
+                            csv(n.getId()),
+                            csv(n.getNama()),
+                            csv(tipe),
+                            csv(t.getDeskripsi()),
+                            csv(jumlah),
+                            csv(berat),
+                            csv(kategori),
+                            ""));
+                    w.newLine();
+                }
+            }
+        }
+    }
+
+    public void exportLaporanCsv(Path file) throws IOException {
+        Map<String, Double> totalBeratPerKategori = new LinkedHashMap<String, Double>();
+        double totalNilaiSetoran = 0;
+        double totalNilaiPencairan = 0;
+        int jumlahSetoran = 0;
+        int jumlahPencairan = 0;
+        double totalBerat = 0;
+        for (Nasabah nasabah : daftarNasabah) {
+            for (Transaksi transaksi : nasabah.getRiwayat()) {
+                if (transaksi.getKategoriSampah() != null) {
+                    totalBeratPerKategori.merge(transaksi.getKategoriSampah(), transaksi.getBeratKg(), Double::sum);
+                    totalNilaiSetoran += transaksi.getJumlah();
+                    totalBerat += transaksi.getBeratKg();
+                    jumlahSetoran++;
+                } else {
+                    jumlahPencairan++;
+                    totalNilaiPencairan += transaksi.getJumlah();
+                }
+            }
+        }
+        try (BufferedWriter w = Files.newBufferedWriter(file, StandardCharsets.UTF_8)) {
+            w.write("Metrik,Nilai"); w.newLine();
+            w.write("Jumlah nasabah," + daftarNasabah.size()); w.newLine();
+            w.write("Jumlah setoran," + jumlahSetoran); w.newLine();
+            w.write("Jumlah pencairan (transfer)," + jumlahPencairan); w.newLine();
+            w.write("Total berat sampah (kg)," + String.format(Locale.US, "%.4f", totalBerat)); w.newLine();
+            w.write("Total nilai setoran," + String.format(Locale.US, "%.2f", totalNilaiSetoran)); w.newLine();
+            w.write("Total dana dicairkan," + String.format(Locale.US, "%.2f", totalNilaiPencairan)); w.newLine();
+            w.write("Total saldo beredar," + String.format(Locale.US, "%.2f", totalSaldoBeredar())); w.newLine();
+            w.newLine();
+            w.write("Kategori,Total Berat (kg)"); w.newLine();
+            for (Map.Entry<String, Double> e : totalBeratPerKategori.entrySet()) {
+                w.write(csv(e.getKey()) + "," + String.format(Locale.US, "%.4f", e.getValue())); w.newLine();
+            }
+        }
+    }
+
+    private String csv(String s) {
+        if (s == null) return "";
+        String v = s.replace("\"", "\"\"");
+        if (v.contains(",") || v.contains("\"") || v.contains("\n") || v.contains("\r")) {
+            return "\"" + v + "\"";
+        }
+        return v;
+    }
+
+    private String safeCsv(String s) { return s == null ? "" : s; }
+
     private String generateIdTransaksi() {
         return String.format("T%03d", counterTransaksi++);
     }
@@ -129,7 +286,7 @@ public class BankSampah {
         System.out.println();
         System.out.println("=== LAPORAN BANK SAMPAH ===");
 
-        Map<String, Double> totalBeratPerKategori = new LinkedHashMap<>();
+        Map<String, Double> totalBeratPerKategori = new LinkedHashMap<String, Double>();
         double totalNilaiSetoran = 0;
         double totalNilaiPencairan = 0;
         int jumlahSetoran = 0;
@@ -168,6 +325,10 @@ public class BankSampah {
             }
         }
         System.out.println("===========================");
+    }
+
+    public double getTotalSaldoBeredar() {
+        return totalSaldoBeredar();
     }
 
     private double totalSaldoBeredar() {
@@ -271,6 +432,65 @@ public class BankSampah {
             writer.newLine();
             writer.write("penarikan=" + counterPenarikan);
             writer.newLine();
+        }
+    }
+
+    private void simpanSampahQuiet() {
+        try {
+            if (!Files.exists(DATA_DIR)) Files.createDirectories(DATA_DIR);
+            simpanSampah();
+        } catch (IOException e) {
+            System.err.println("Gagal menyimpan data sampah: " + e.getMessage());
+        }
+    }
+
+    private void simpanSampah() throws IOException {
+        try (BufferedWriter writer = Files.newBufferedWriter(SAMPAH_FILE, StandardCharsets.UTF_8)) {
+            for (Sampah s : daftarSampah) {
+                String tipe = "KUSTOM";
+                String aturan = "NORMAL";
+                String kategori = s.getKategori();
+                if (s instanceof Plastik) { tipe = "PLASTIK"; aturan = "BONUS5_MIN10"; kategori = s.getKategori(); }
+                else if (s instanceof Kertas) { tipe = "KERTAS"; aturan = "NORMAL"; kategori = s.getKategori(); }
+                else if (s instanceof Logam) { tipe = "LOGAM"; aturan = "BONUS5"; kategori = s.getKategori(); }
+                else if (s instanceof Organik) { tipe = "ORGANIK"; aturan = "NORMAL"; kategori = s.getKategori(); }
+                else if (s instanceof SampahKustom) { tipe = "KUSTOM"; aturan = ((SampahKustom) s).getAturan(); kategori = s.getKategori(); }
+                writer.write(String.join("|",
+                        esc(s.getNama()),
+                        String.format(Locale.US, "%.2f", s.getHargaPerKg()),
+                        tipe,
+                        esc(kategori),
+                        esc(aturan)));
+                writer.newLine();
+            }
+        }
+    }
+
+    private void muatSampah() throws IOException {
+        daftarSampah.clear();
+        if (!Files.exists(SAMPAH_FILE)) return;
+        try (BufferedReader reader = Files.newBufferedReader(SAMPAH_FILE, StandardCharsets.UTF_8)) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (line.trim().isEmpty()) continue;
+                String[] p = split(line, 5);
+                if (p.length < 3) continue;
+                try {
+                    String nama = unesc(p[0]);
+                    double harga = Double.parseDouble(unesc(p[1]));
+                    String tipe = unesc(p[2]).toUpperCase();
+                    String kategori = p.length > 3 ? unesc(p[3]) : "";
+                    String aturan = p.length > 4 ? unesc(p[4]) : "NORMAL";
+                    Sampah s = null;
+                    if ("PLASTIK".equals(tipe)) s = new Plastik(harga);
+                    else if ("KERTAS".equals(tipe)) s = new Kertas(harga);
+                    else if ("LOGAM".equals(tipe)) s = new Logam(harga);
+                    else if ("ORGANIK".equals(tipe)) s = new Organik(harga);
+                    else s = new SampahKustom(nama, harga, kategori, aturan);
+                    if (s != null) daftarSampah.add(s);
+                } catch (Exception ignored) {
+                }
+            }
         }
     }
 

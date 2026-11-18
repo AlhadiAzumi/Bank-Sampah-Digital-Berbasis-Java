@@ -1,432 +1,87 @@
 # Bank Sampah Digital
 
 Proyek akhir mata kuliah **Pemrograman Berorientasi Objek (PBO)** menggunakan **Java**.
-Aplikasi ini sekarang memiliki **antarmuka GUI (Swing)** untuk memudahkan pengelolaan Bank Sampah: mencatat setoran
-sampah warga, mengonversinya menjadi saldo rupiah, dan melakukan **pencairan saldo secara transfer digital** ke rekening/e-wallet nasabah.
-Mode CLI tetap tersedia sebagai opsi.
+Aplikasi ini memiliki **antarmuka GUI (Swing)** untuk memudahkan pengelolaan Bank Sampah: mencatat setoran sampah warga, mengonversinya menjadi saldo rupiah, dan melakukan **pencairan saldo secara transfer digital** ke rekening/e-wallet nasabah. Mode CLI tetap tersedia sebagai opsi.
 
-Data transaksi disimpan **otomatis (persisten)** ke file CSV di folder `data/` (nasabah, setoran, pencairan, counter), sehingga tidak hilang saat program ditutup. Data juga dimuat otomatis saat aplikasi dijalankan.
+Data transaksi, nasabah, counter, dan **jenis sampah** disimpan **otomatis (persisten)** ke file CSV di folder `data/` dan dimuat kembali saat aplikasi dijalankan.
 
 ---
 
-## 1. Latar Belakang Masalah
+## 1. Fitur Utama
 
-Pengelola Bank Sampah sering mencatat setoran warga secara manual. Akibatnya:
-
-- Nilai rupiah dari sampah sulit dihitung cepat dan konsisten.
-- Saldo tabungan warga rawan salah catat.
-- Riwayat setoran/pencairan tidak transparan dan pencairan tunai sulit dilacak.
-- Data hilang/rentan rusak karena tidak tersimpan digital.
-
-Aplikasi ini menyelesaikan masalah tersebut dengan aturan perhitungan otomatis, validasi saldo,
-pencairan saldo lewat **transfer digital ke rekening/e-wallet nasabah** (dengan nomor referensi),
-riwayat transaksi, laporan, dan **penyimpanan data otomatis** ke file.
-
----
-
-## 2. Fitur
-
-| Menu/Tab | Fitur | Keterangan |
+| Tab/Menu | Fitur | Keterangan |
 |----------|-------|------------|
-| 1 | Tambah Nasabah | ID otomatis (`N001`, ...), wajib isi tujuan transfer (Bank/E-Wallet & No. Rekening/Tujuan, angka), validasi No. HP & rekening |
-| 2 | Lihat Semua Nasabah | Menampilkan data nasabah, rekening tujuan, saldo, dan fitur **cari/filter nasabah** (GUI) |
-| 3 | Setor Sampah | Input jenis sampah + berat, nilai dihitung otomatis |
-| 4 | Pencairan Saldo (Transfer) | Saldo ditransfer ke rekening/e-wallet terdaftar, konfirmasi sebelum kirim, No. Referensi (`TRF001`, ...), ditolak jika saldo tidak cukup |
-| 5 | Riwayat Transaksi | Menampilkan setoran & pencairan (termasuk tujuan dan no. referensi) |
-| 6 | Laporan | Total kg per kategori, total nilai setoran, total dana dicairkan, saldo beredar |
-| 7 | Keluar | Menghentikan program (mode CLI) |
+| Dashboard | Ringkasan | Total nasabah, setoran, pencairan, sampah terkelola (kg), nilai setoran, dana dicairkan, saldo beredar |
+| Nasabah | Kelola nasabah | ID otomatis (`N001`), wajib isi tujuan transfer (Bank/E-Wallet & No. Rekening angka), cari/filter nasabah |
+| Setor Sampah | Setoran | Pilih nasabah & jenis sampah, input berat, nilai dihitung otomatis (polimorfisme + aturan bonus) |
+| Pencairan Saldo | Transfer digital | Konfirmasi transfer ke rekening/e-wallet terdaftar, No. Referensi (`TRF001`), **struk bukti `.txt`** otomatis di folder `struk/` |
+| Riwayat | Riwayat transaksi | Tampil per nasabah / **Semua Nasabah**, filter jenis (setoran/pencairan), rentang tanggal, pencarian, **ekspor CSV** |
+| Jenis Sampah | Kelola sampah | Tambah jenis baru & ubah harga/kg dari UI, tersimpan persisten (`data/sampah.csv`) |
+| Laporan | Laporan | Rekap per kategori, total nilai setoran/dicairkan, saldo beredar, **ekspor laporan CSV** |
 
-Jenis sampah awal yang tersedia:
-
-| Jenis | Harga / kg | Aturan Nilai |
-|-------|-----------|--------------|
-| Plastik | Rp4.000 | Bonus 5% jika berat >= 10 kg |
-| Kertas | Rp2.500 | Berat x harga |
-| Logam | Rp12.000 | Bonus 5% (insentif logam) |
-| Organik | Rp1.000 | Berat x harga |
+Jenis sampah awal: Plastik (Rp4.000/kg, bonus 5% min 10kg), Kertas (Rp2.500/kg), Logam (Rp12.000/kg, bonus 5%), Organik (Rp1.000/kg).
 
 ---
 
-## 3. Penerapan 4 Pilar PBO
+## 2. Penerapan 4 Pilar PBO
 
-### a. Encapsulation (Enkapsulasi)
-
-- Field pada `Sampah`, `Nasabah`, dan `Transaksi` bersifat `private`.
-- Saldo nasabah **tidak memiliki setter bebas**. Saldo hanya bisa berubah melalui
-  `tambahSaldo()` dan `tarikSaldo()` (pencairan) yang memiliki validasi.
-- Data rekening tujuan nasabah divalidasi (tidak boleh kosong) saat pendaftaran.
-- `getRiwayat()` mengembalikan `Collections.unmodifiableList(...)` agar riwayat tidak bisa
-  diubah dari luar.
-
-Contoh: `src/model/Nasabah.java`
-
-```java
-private double saldo;
-
-public void tarikSaldo(double jumlah) {
-    if (jumlah <= 0) {
-        throw new IllegalArgumentException("Jumlah pencairan harus lebih dari 0.");
-    }
-    if (jumlah > saldo) {
-        throw new IllegalArgumentException("Saldo tidak cukup. Saldo saat ini: " + Format.rupiah(saldo));
-    }
-    saldo -= jumlah;
-}
-```
-
-### b. Inheritance (Pewarisan)
-
-- `Plastik`, `Kertas`, `Logam`, `Organik` mewarisi `Sampah`.
-- `Setoran` dan `Penarikan` (pencairan transfer) mewarisi `Transaksi`.
-
-Contoh: `src/model/Plastik.java`
-
-```java
-public class Plastik extends Sampah {
-    public Plastik(double hargaPerKg) {
-        super("Plastik", hargaPerKg);
-    }
-}
-```
-
-### c. Polymorphism (Polimorfisme)
-
-- `hitungNilai()` di-override berbeda di setiap subclass `Sampah`.
-- Objek disimpan sebagai `List<Sampah>` lalu dipanggil secara runtime, sehingga rumus yang
-  dipakai menyesuaikan jenis objek sebenarnya.
-- `getDeskripsi()` di-override pada `Setoran` dan `Penarikan` (menampilkan detail transfer & no. referensi).
-
-Contoh: `src/service/BankSampah.java`
-
-```java
-Sampah sampah = cariSampah(namaSampah);       // bisa Plastik/Kertas/Logam/Organik
-Setoran setoran = new Setoran(id, sampah, beratKg);
-// Di dalam Setoran, sampah.hitungNilai(beratKg) memakai rumus subclass yang tepat
-```
-
-### d. Abstract Class & Abstract Method
-
-- `Sampah` adalah `abstract class` dengan method abstrak `hitungNilai()` dan `getKategori()`.
-- `Transaksi` adalah `abstract class` dengan method abstrak `getJumlah()` dan `getDeskripsi()`.
-
-Contoh: `src/model/Sampah.java`
-
-```java
-public abstract class Sampah {
-    public abstract double hitungNilai(double beratKg);
-    public abstract String getKategori();
-}
-```
+- **Encapsulation**: field `private`, saldo hanya berubah via `tambahSaldo()`/`tarikSaldo()` (validasi), `getRiwayat()` unmodifiable.
+- **Inheritance**: `Plastik/Kertas/Logam/Organik/SampahKustom` extends `Sampah`; `Setoran` & `Penarikan` extends `Transaksi`.
+- **Polymorphism**: `hitungNilai()` di-override berbeda per jenis; dipanggil via referensi `Sampah` saat setor. `getDeskripsi()` di-override pada transaksi.
+- **Abstract class/method**: `Sampah` (abstrak: `hitungNilai`, `getKategori`) dan `Transaksi` (abstrak: `getJumlah`, `getDeskripsi`).
 
 ---
 
-## 4. Class Diagram
-
-```mermaid
-classDiagram
-    class Sampah {
-        <<abstract>>
-        -String nama
-        -double hargaPerKg
-        +hitungNilai(double beratKg)* double
-        +getKategori()* String
-    }
-
-    class Plastik {
-        +hitungNilai(double beratKg) double
-    }
-    class Kertas {
-        +hitungNilai(double beratKg) double
-    }
-    class Logam {
-        +hitungNilai(double beratKg) double
-    }
-    class Organik {
-        +hitungNilai(double beratKg) double
-    }
-
-    class Transaksi {
-        <<abstract>>
-        -String id
-        -LocalDateTime waktu
-        +getJumlah()* double
-        +getDeskripsi()* String
-    }
-
-    class Setoran {
-        -Sampah sampah
-        -double beratKg
-        -double nilai
-        +getJumlah() double
-        +getDeskripsi() String
-    }
-
-    class Penarikan {
-        -double jumlah
-        -String bankEwallet
-        -String noRekening
-        -String namaNasabah
-        +getNoReferensi() String
-        +getJumlah() double
-        +getDeskripsi() String
-    }
-
-    class Nasabah {
-        -String id
-        -String nama
-        -String alamat
-        -String noHp
-        -String bankEwallet
-        -String noRekening
-        -double saldo
-        -List~Transaksi~ riwayat
-        +getTujuanTransfer() String
-        +tambahSaldo(double)
-        +tarikSaldo(double)
-        +tambahTransaksi(Transaksi)
-    }
-
-    class BankSampah {
-        -List~Nasabah~ daftarNasabah
-        -List~Sampah~ daftarSampah
-        +tambahNasabah(nama, alamat, noHp, bankEwallet, noRekening) Nasabah
-        +setorSampah(idNasabah, namaSampah, beratKg) Setoran
-        +tarikSaldo(idNasabah, jumlah) Penarikan
-        +cetakLaporan()
-    }
-
-    Sampah <|-- Plastik
-    Sampah <|-- Kertas
-    Sampah <|-- Logam
-    Sampah <|-- Organik
-    Transaksi <|-- Setoran
-    Transaksi <|-- Penarikan
-
-    BankSampah o-- Nasabah
-    BankSampah o-- Sampah
-    Nasabah o-- Transaksi
-    Setoran --> Sampah
-```
-
----
-
-## 5. Struktur Folder
+## 3. Struktur Folder
 
 ```
 project/
-├── README.md
-├── .gitignore
-├── data/                        (dibuat otomatis, penyimpanan data persisten)
-│   ├── nasabah.csv
-│   ├── setoran.csv
-│   ├── penarikan.csv
-│   └── counters.properties
-├── bin/                         (hasil kompilasi .class)
-└── src/
-    ├── Main.java                (entry point: GUI default, CLI opsional)
-    ├── BankSampahGUI.java       (antarmuka GUI Swing)
-    ├── BankSampahCLI.java       (antarmuka CLI lama)
-    ├── model/
-    │   ├── Sampah.java          (abstract)
-    │   ├── Plastik.java
-    │   ├── Kertas.java
-    │   ├── Logam.java
-    │   ├── Organik.java
-    │   ├── Nasabah.java
-    │   ├── Transaksi.java       (abstract)
-    │   ├── Setoran.java
-    │   └── Penarikan.java       (pencairan/transfer saldo)
-    ├── service/
-    │   └── BankSampah.java      (logika bisnis + koleksi data + persistensi)
-    └── util/
-        └── Format.java          (format Rupiah & angka)
+  README.md
+  .gitignore
+  data/                (dibuat otomatis, persisten, di-ignore git)
+    nasabah.csv, setoran.csv, penarikan.csv, counters.properties, sampah.csv
+  struk/               (dibuat otomatis, bukti transfer .txt, di-ignore git)
+  bin/                 (hasil kompilasi)
+  src/
+    Main.java
+    BankSampahGUI.java
+    BankSampahCLI.java
+    model/ (Sampah, Plastik, Kertas, Logam, Organik, SampahKustom, Nasabah, Transaksi, Setoran, Penarikan)
+    service/BankSampah.java
+    util/Format.java
 ```
 
 ---
 
-## 6. Workflow Aplikasi
+## 4. Cara Kompilasi & Menjalankan
 
-### Alur saat program dijalankan
-
-1. `Main` menjalankan `BankSampahGUI.launch()` (default) atau `BankSampahCLI` jika diberi argumen `--cli`.
-2. GUI/CLI membuat objek `BankSampah`.
-3. Konstruktor `BankSampah` mengisi daftar jenis sampah awal dan **memuat data tersimpan** dari folder `data/` (jika ada).
-4. Pengguna mengelola nasabah, setoran, pencairan saldo (transfer), riwayat, dan laporan - **setiap perubahan disimpan otomatis**.
-
-### Alur Tambah Nasabah
-
-```
-Input nama, alamat, no HP, bank/e-wallet, no. rekening/tujuan
-        |
-        v
-Validasi field wajib (nama, bank/e-wallet, no. rekening)
-        |
-        v
-Nasabah dibuat dengan ID otomatis + saldo 0
-```
-
-### Alur Setor Sampah
-
-```
-Input ID nasabah + jenis sampah + berat
-        |
-        v
-BankSampah.setorSampah()
-        |
-        +--> cariNasabah()  (validasi ID)
-        +--> cariSampah()   (validasi jenis)
-        +--> new Setoran(...)
-        |         |
-        |         +--> sampah.hitungNilai(berat)  <-- polymorphism
-        |
-        +--> nasabah.tambahSaldo(nilai)           <-- enkapsulasi saldo
-        +--> nasabah.tambahTransaksi(setoran)     <-- riwayat
-        |
-        v
-Tampilkan nilai setoran + saldo terbaru
-```
-
-### Alur Pencairan Saldo (Transfer Digital)
-
-```
-Input ID nasabah + jumlah + konfirmasi
-        |
-        v
-BankSampah.tarikSaldo()
-        |
-        +--> nasabah.tarikSaldo(jumlah)
-        |         |
-        |         +--> validasi jumlah > 0
-        |         +--> validasi jumlah <= saldo
-        |
-        +--> generateNoReferensi() -> TRFxxx
-        +--> new Penarikan(ref, jumlah, bank, norek, nama)
-        +--> simpan ke riwayat nasabah
-        |
-        v
-Tampilkan no. referensi, tujuan transfer, jumlah, saldo terbaru
-```
-
-### Alur Laporan
-
-1. Iterasi seluruh nasabah dan seluruh transaksinya.
-2. Transaksi setoran dijumlahkan beratnya per kategori (`getKategoriSampah()`).
-3. Total nilai setoran, total dana dicairkan, jumlah pencairan, dan total saldo beredar dihitung.
-4. Hasil ditampilkan (GUI/CLI).
-
----
-
-## 7. Cara Kompilasi dan Menjalankan
-
-Prasyarat: **JDK 8 atau lebih baru** sudah terpasang.
-
-Buka PowerShell di folder proyek, lalu jalankan:
+Prasyarat: **JDK 8+**.
 
 ```powershell
-javac -d bin -sourcepath src src/Main.java src/BankSampahGUI.java src/BankSampahCLI.java
-java -cp bin Main
+javac --release 8 -d bin -sourcepath src src/Main.java src/BankSampahGUI.java src/BankSampahCLI.java
+java -cp bin Main        # GUI (default)
+java -cp bin Main --cli  # CLI
 ```
 
-- `java -cp bin Main` : membuka **GUI** (default)
-- `java -cp bin Main --cli` : menjalankan mode **CLI**
-
-> Jika `javac` dan `java` berbeda versi dan muncul `UnsupportedClassVersionError`, kompilasi dengan target Java 8:
-> ```powershell
-> javac --release 8 -d bin -sourcepath src src/Main.java src/BankSampahGUI.java src/BankSampahCLI.java
-> java -cp bin Main
-> ```
-> (Pada JDK terbaru bisa muncul warning obsolete options, tetapi aman diabaikan.)
-
-Alternatif: buka folder proyek di IntelliJ IDEA / NetBeans / Eclipse, tandai `src` sebagai
-source root, lalu jalankan `Main.java`.
+`--release 8` dipakai agar kompatibel bila runtime Java 8 (menghindari `UnsupportedClassVersionError`).
 
 ---
 
-## 8. Skenario Demo (untuk Presentasi)
+## 5. Skenario Demo Singkat
 
-Urutan input yang bisa dicoba:
-
-| Langkah | Menu/Tab | Input | Hasil yang Diharapkan |
-|---------|----------|-------|------------------------|
-| 1 | Tambah Nasabah | Nama: `Budi`, Alamat: `Jl. Mawar`, No HP: `08123`, Bank/E-Wallet: `BCA`, No. Rekening: `1234567890` | Nasabah `N001` dibuat dengan tujuan transfer `BCA 1234567890 a.n. Budi` |
-| 2 | Setor Sampah | ID: `N001`, Jenis: `Plastik`, Berat: `12` | Nilai `Rp50.400` (12 x 4.000 + bonus 5%), saldo `Rp50.400` |
-| 3 | Pencairan Saldo | ID: `N001`, Jumlah: `20000`, Konfirmasi: `Ya` | Transfer berhasil, No. Referensi `TRF001`, saldo menjadi `Rp30.400` |
-| 4 | Pencairan Saldo | ID: `N001`, Jumlah: `100000` | Ditolak: saldo tidak cukup |
-| 5 | Riwayat Transaksi | ID: `N001` | Tampil setoran dan transfer (tujuan + Ref: TRF001) |
-| 6 | Laporan | - | Total setoran, total dana dicairkan, saldo beredar, total kg per kategori |
-
-Contoh output pencairan berhasil (CLI):
-
-```
-Pencairan berhasil diproses!
-No. Referensi : TRF001
-Tujuan        : BCA 1234567890 a.n. Budi
-Jumlah        : Rp20.000
-Saldo sekarang: Rp30.400
-```
-
-Contoh output pencairan yang ditolak:
-
-```
-Gagal mencairkan saldo: Saldo tidak cukup. Saldo saat ini: Rp30.400
-```
+1. **Tambah Nasabah**: Budi, alamat, HP, BCA, 1234567890 → `N001`, tujuan transfer tercatat.
+2. **Setor Sampah**: `N001`, Plastik, 12 kg → nilai Rp50.400 (bonus 5%), saldo Rp50.400.
+3. **Pencairan/Transfer**: `N001`, Rp20.000, konfirmasi → sukses, Ref `TRF001`, saldo Rp30.400, **struk tersimpan** di `struk/Struk_TRF001.txt`.
+4. **Pencairan > saldo**: ditolak (saldo tidak cukup).
+5. **Riwayat**: filter/cari, tampil setoran & transfer (tujuan + Ref), ekspor CSV.
+6. **Dashboard/Laporan**: ringkasan & rekap kategori, ekspor laporan CSV.
+7. **Jenis Sampah**: tambah jenis baru / ubah harga (tersimpan dan langsung dipakai).
 
 ---
 
-## 9. Aturan Validasi
+## 6. Aturan Validasi & Catatan
 
-- Nama nasabah, Bank/E-Wallet, dan No. Rekening/Tujuan tidak boleh kosong.
-- No. HP (jika diisi) dan No. Rekening/Tujuan harus berupa **angka (digit)**.
-- Berat sampah harus lebih dari 0 kg.
-- Jumlah pencairan harus lebih dari 0 dan tidak melebihi saldo.
-- Saldo tidak pernah bernilai negatif.
-- ID nasabah dan jenis sampah harus terdaftar.
-- Setiap pencairan diproses sebagai **transfer digital** ke rekening/e-wallet terdaftar dengan **nomor referensi unik**.
-- Input angka yang salah akan ditolak dan diminta ulang (program tidak crash).
-
----
-
-## 10. Cara Menambah Jenis Sampah Baru
-
-Untuk menunjukkan bahwa desain mudah dikembangkan:
-
-1. Buat file baru di `src/model/`, misalnya `Kaca.java`:
-
-   ```java
-   package model;
-
-   public class Kaca extends Sampah {
-       public Kaca(double hargaPerKg) {
-           super("Kaca", hargaPerKg);
-       }
-
-       @Override
-       public double hitungNilai(double beratKg) {
-           validasiBerat(beratKg);
-           return beratKg * getHargaPerKg() * 1.02;
-       }
-
-       @Override
-       public String getKategori() {
-           return "Anorganik - Kaca";
-       }
-   }
-   ```
-
-2. Daftarkan di `seedJenisSampah()` pada `src/service/BankSampah.java`:
-
-   ```java
-   daftarSampah.add(new Kaca(3000));
-   ```
-
-3. Kompilasi ulang. Jenis sampah baru langsung bisa dipakai tanpa mengubah logika transaksi.
-
----
-
-## 11. Catatan
-
-- **Persistensi data**: nasabah, transaksi (setoran & pencairan), dan counter ID disimpan otomatis ke file CSV di folder `data/` dan dimuat kembali saat aplikasi dijalankan (tanpa database eksternal).
-- Pencairan saldo dicatat sebagai **transfer digital (simulasi)** ke rekening/e-wallet nasabah dengan nomor referensi sebagai bukti transaksi (bukan tunai).
-- GUI mendukung pencarian/filter nasabah, konfirmasi transfer, dan tampilan tujuan transfer yang jelas.
-- Format Rupiah menggunakan `Locale` Indonesia sehingga tampil seperti `Rp4.000`.
-- Proyek tidak memakai library eksternal, cukup JDK standar.
+- Nama, Bank/E-Wallet, No. Rekening wajib; No. HP (jika diisi) & No. Rekening harus **angka**.
+- Berat & jumlah pencairan > 0; pencairan tidak boleh melebihi saldo (saldo tidak pernah negatif).
+- Pencairan = **transfer digital (simulasi)** ke rekening/e-wallet terdaftar dengan **No. Referensi unik** + struk bukti.
+- **Persistensi otomatis**: data & jenis sampah di `data/`, struk di `struk/` (keduanya di-ignore git). Tanpa library eksternal (JDK standar).
