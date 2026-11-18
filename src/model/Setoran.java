@@ -1,5 +1,7 @@
 package model;
 
+import java.time.LocalDateTime;
+
 import util.Format;
 
 public class Setoran extends Transaksi {
@@ -16,6 +18,16 @@ public class Setoran extends Transaksi {
         this.sampah = sampah;
         this.beratKg = beratKg;
         this.nilai = sampah.hitungNilai(beratKg);
+    }
+
+    public Setoran(String id, LocalDateTime waktu, Sampah sampah, double beratKg, double nilai) {
+        super(id, waktu);
+        if (sampah == null) {
+            throw new IllegalArgumentException("Jenis sampah tidak boleh kosong.");
+        }
+        this.sampah = sampah;
+        this.beratKg = beratKg;
+        this.nilai = nilai;
     }
 
     public Sampah getSampah() {

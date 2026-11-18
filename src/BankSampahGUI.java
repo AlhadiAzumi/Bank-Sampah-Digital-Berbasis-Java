@@ -22,10 +22,15 @@ import javax.swing.JScrollPane;
 import javax.swing.JTabbedPane;
 import javax.swing.JTable;
 import javax.swing.JTextField;
+import javax.swing.RowFilter;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableColumnModel;
+import javax.swing.table.TableRowSorter;
 
 import model.Nasabah;
 import model.Penarikan;
@@ -41,6 +46,7 @@ public class BankSampahGUI extends JFrame {
 
     private DefaultTableModel nasabahTableModel;
     private DefaultTableModel riwayatTableModel;
+    private TableRowSorter<DefaultTableModel> nasabahSorter;
     private JComboBox<String> setorNasabahCombo;
     private JComboBox<String> setorSampahCombo;
     private JComboBox<String> tarikNasabahCombo;
@@ -52,14 +58,17 @@ public class BankSampahGUI extends JFrame {
     private JTextField noRekeningField;
     private JTextField beratField;
     private JTextField jumlahTarikField;
+    private JTextField searchField;
+    private JLabel tujuanTransferLabel;
+    private JLabel statusLabel;
     private JLabel laporanLabel;
 
     public BankSampahGUI() {
         setTitle("Bank Sampah Digital");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setSize(950, 650);
+        setSize(1050, 700);
         setLocationRelativeTo(null);
-        setMinimumSize(new Dimension(800, 550));
+        setMinimumSize(new Dimension(900, 600));
 
         JPanel root = new JPanel(new BorderLayout());
         root.setBackground(new Color(245, 247, 250));
@@ -74,6 +83,7 @@ public class BankSampahGUI extends JFrame {
         tabs.addTab("Laporan", createLaporanPanel());
 
         root.add(tabs, BorderLayout.CENTER);
+        root.add(createFooter(), BorderLayout.SOUTH);
         setContentPane(root);
         refreshAll();
     }
@@ -88,7 +98,7 @@ public class BankSampahGUI extends JFrame {
         title.setFont(new Font("SansSerif", Font.BOLD, 24));
         title.setForeground(Color.WHITE);
 
-        JLabel subtitle = new JLabel("Kelola nasabah, setoran, pencairan saldo digital, dan laporan");
+        JLabel subtitle = new JLabel("Setoran sampah & pencairan saldo digital via transfer (dengan no. referensi)");
         subtitle.setFont(new Font("SansSerif", Font.PLAIN, 13));
         subtitle.setForeground(new Color(230, 245, 235));
 
@@ -103,6 +113,21 @@ public class BankSampahGUI extends JFrame {
         return header;
     }
 
+    private JPanel createFooter() {
+        JPanel footer = new JPanel(new BorderLayout());
+        footer.setBackground(new Color(235, 238, 242));
+        footer.setBorder(BorderFactory.createEmptyBorder(6, 12, 6, 12));
+        statusLabel = new JLabel("Data tersimpan otomatis ke folder data/ (persisten)");
+        statusLabel.setFont(new Font("SansSerif", Font.PLAIN, 12));
+        statusLabel.setForeground(new Color(70, 80, 90));
+        footer.add(statusLabel, BorderLayout.WEST);
+        JLabel hint = new JLabel("Pencairan saldo diproses sebagai transfer ke rekening/e-wallet nasabah");
+        hint.setFont(new Font("SansSerif", Font.PLAIN, 12));
+        hint.setForeground(new Color(70, 80, 90));
+        footer.add(hint, BorderLayout.EAST);
+        return footer;
+    }
+
     private JPanel createNasabahPanel() {
         JPanel panel = new JPanel(new BorderLayout(12, 12));
         panel.setBorder(BorderFactory.createEmptyBorder(16, 16, 16, 16));
@@ -115,11 +140,11 @@ public class BankSampahGUI extends JFrame {
         gbc.insets = new Insets(6, 8, 6, 8);
         gbc.fill = GridBagConstraints.HORIZONTAL;
 
-        namaField = new JTextField(20);
-        alamatField = new JTextField(20);
-        noHpField = new JTextField(20);
-        bankEwalletField = new JTextField(20);
-        noRekeningField = new JTextField(20);
+        namaField = new JTextField(18);
+        alamatField = new JTextField(18);
+        noHpField = new JTextField(18);
+        bankEwalletField = new JTextField(18);
+        noRekeningField = new JTextField(18);
 
         gbc.gridx = 0; gbc.gridy = 0; gbc.weightx = 0;
         form.add(new JLabel("Nama"), gbc);
@@ -132,7 +157,7 @@ public class BankSampahGUI extends JFrame {
         form.add(alamatField, gbc);
 
         gbc.gridx = 0; gbc.gridy = 1; gbc.weightx = 0;
-        form.add(new JLabel("No HP"), gbc);
+        form.add(new JLabel("No HP (angka)"), gbc);
         gbc.gridx = 1; gbc.weightx = 1;
         form.add(noHpField, gbc);
 
@@ -142,7 +167,7 @@ public class BankSampahGUI extends JFrame {
         form.add(bankEwalletField, gbc);
 
         gbc.gridx = 0; gbc.gridy = 2; gbc.weightx = 0;
-        form.add(new JLabel("No. Rekening/Tujuan"), gbc);
+        form.add(new JLabel("No. Rekening/Tujuan (angka)"), gbc);
         gbc.gridx = 1; gbc.weightx = 1;
         form.add(noRekeningField, gbc);
 
@@ -157,10 +182,57 @@ public class BankSampahGUI extends JFrame {
         };
         JTable table = new JTable(nasabahTableModel);
         styleTable(table);
+        nasabahSorter = new TableRowSorter<DefaultTableModel>(nasabahTableModel);
+        table.setRowSorter(nasabahSorter);
+        table.setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS);
+        setNasabahColumnWidths(table);
+
+        JPanel searchPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 6));
+        searchPanel.setOpaque(false);
+        searchPanel.add(new JLabel("Cari nasabah:"));
+        searchField = new JTextField(24);
+        searchField.getDocument().addDocumentListener(new DocumentListener() {
+            public void insertUpdate(DocumentEvent e) { filterNasabah(); }
+            public void removeUpdate(DocumentEvent e) { filterNasabah(); }
+            public void changedUpdate(DocumentEvent e) { filterNasabah(); }
+        });
+        searchPanel.add(searchField);
+        searchPanel.add(new JLabel("(filter berdasarkan ID/nama/bank/no. rekening)"));
+
+        JPanel center = new JPanel(new BorderLayout(0, 6));
+        center.setOpaque(false);
+        center.add(searchPanel, BorderLayout.NORTH);
+        center.add(new JScrollPane(table), BorderLayout.CENTER);
 
         panel.add(form, BorderLayout.NORTH);
-        panel.add(new JScrollPane(table), BorderLayout.CENTER);
+        panel.add(center, BorderLayout.CENTER);
         return panel;
+    }
+
+    private void filterNasabah() {
+        if (nasabahSorter == null || searchField == null) return;
+        String text = searchField.getText();
+        if (text == null || text.trim().isEmpty()) {
+            nasabahSorter.setRowFilter(null);
+        } else {
+            try {
+                nasabahSorter.setRowFilter(RowFilter.regexFilter("(?i)" + java.util.regex.Pattern.quote(text.trim())));
+            } catch (Exception e) {
+                nasabahSorter.setRowFilter(null);
+            }
+        }
+    }
+
+    private void setNasabahColumnWidths(JTable table) {
+        TableColumnModel cm = table.getColumnModel();
+        if (cm.getColumnCount() < 7) return;
+        cm.getColumn(0).setPreferredWidth(60);
+        cm.getColumn(1).setPreferredWidth(140);
+        cm.getColumn(2).setPreferredWidth(170);
+        cm.getColumn(3).setPreferredWidth(110);
+        cm.getColumn(4).setPreferredWidth(120);
+        cm.getColumn(5).setPreferredWidth(130);
+        cm.getColumn(6).setPreferredWidth(120);
     }
 
     private JPanel createSetorPanel() {
@@ -224,24 +296,49 @@ public class BankSampahGUI extends JFrame {
         card.add(heading, gbc);
 
         tarikNasabahCombo = new JComboBox<>();
+        tarikNasabahCombo.addActionListener(e -> updateTujuanTransferInfo());
         jumlahTarikField = new JTextField();
+        tujuanTransferLabel = new JLabel("Pilih nasabah untuk melihat tujuan transfer.");
+        tujuanTransferLabel.setForeground(new Color(40, 90, 50));
+        tujuanTransferLabel.setFont(new Font("SansSerif", Font.PLAIN, 13));
 
         gbc.gridwidth = 1;
         addRow(card, gbc, 1, "Nasabah", tarikNasabahCombo);
-        addRow(card, gbc, 2, "Jumlah (Rp)", jumlahTarikField);
+
+        gbc.gridx = 0; gbc.gridy = 2; gbc.weightx = 0; gbc.anchor = GridBagConstraints.WEST;
+        card.add(new JLabel("Tujuan Transfer"), gbc);
+        gbc.gridx = 1; gbc.weightx = 1; gbc.fill = GridBagConstraints.HORIZONTAL;
+        card.add(tujuanTransferLabel, gbc);
+
+        addRow(card, gbc, 3, "Jumlah (Rp)", jumlahTarikField);
 
         JButton tarikBtn = primaryButton("Proses Transfer");
         tarikBtn.addActionListener(e -> tarikSaldo());
-        gbc.gridx = 1; gbc.gridy = 3; gbc.anchor = GridBagConstraints.EAST;
+        gbc.gridx = 1; gbc.gridy = 4; gbc.anchor = GridBagConstraints.EAST; gbc.fill = GridBagConstraints.NONE; gbc.weightx = 0;
         card.add(tarikBtn, gbc);
 
-        JLabel info = new JLabel("Saldo ditransfer ke rekening/e-wallet terdaftar nasabah dan tercatat dengan no. referensi.");
+        JLabel info = new JLabel("Saldo ditransfer ke rekening/e-wallet terdaftar dan tercatat dengan No. Referensi.");
         info.setForeground(new Color(90, 100, 110));
-        gbc.gridx = 0; gbc.gridy = 4; gbc.gridwidth = 2; gbc.anchor = GridBagConstraints.WEST;
+        gbc.gridx = 0; gbc.gridy = 5; gbc.gridwidth = 2; gbc.anchor = GridBagConstraints.WEST; gbc.fill = GridBagConstraints.HORIZONTAL; gbc.weightx = 1;
         card.add(info, gbc);
 
         panel.add(card, new GridBagConstraints());
         return panel;
+    }
+
+    private void updateTujuanTransferInfo() {
+        if (tujuanTransferLabel == null) return;
+        String nasabahId = selectedId(tarikNasabahCombo);
+        if (nasabahId == null) {
+            tujuanTransferLabel.setText("Pilih nasabah untuk melihat tujuan transfer.");
+            return;
+        }
+        try {
+            Nasabah n = bank.cariNasabah(nasabahId);
+            tujuanTransferLabel.setText(n.getTujuanTransfer() + "  |  Saldo: " + Format.rupiah(n.getSaldo()));
+        } catch (Exception e) {
+            tujuanTransferLabel.setText("-");
+        }
     }
 
     private JPanel createRiwayatPanel() {
@@ -259,11 +356,17 @@ public class BankSampahGUI extends JFrame {
         refresh.addActionListener(e -> refreshRiwayat());
         top.add(refresh);
 
-        riwayatTableModel = new DefaultTableModel(new Object[]{"ID", "Waktu", "Deskripsi"}, 0) {
+        riwayatTableModel = new DefaultTableModel(new Object[]{"ID/Ref", "Waktu", "Deskripsi"}, 0) {
             public boolean isCellEditable(int row, int column) { return false; }
         };
         JTable table = new JTable(riwayatTableModel);
         styleTable(table);
+        table.setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS);
+        if (table.getColumnModel().getColumnCount() >= 3) {
+            table.getColumnModel().getColumn(0).setPreferredWidth(90);
+            table.getColumnModel().getColumn(1).setPreferredWidth(150);
+            table.getColumnModel().getColumn(2).setPreferredWidth(520);
+        }
 
         panel.add(top, BorderLayout.NORTH);
         panel.add(new JScrollPane(table), BorderLayout.CENTER);
@@ -301,7 +404,8 @@ public class BankSampahGUI extends JFrame {
             Nasabah n = bank.tambahNasabah(namaField.getText(), alamatField.getText(), noHpField.getText(),
                     bankEwalletField.getText(), noRekeningField.getText());
             JOptionPane.showMessageDialog(this,
-                    "Nasabah berhasil ditambahkan dengan ID " + n.getId() + ".\nTujuan transfer: " + n.getTujuanTransfer(),
+                    "Nasabah berhasil ditambahkan dengan ID " + n.getId() + ".\nTujuan transfer: " + n.getTujuanTransfer()
+                            + "\n\nData tersimpan otomatis.",
                     "Berhasil", JOptionPane.INFORMATION_MESSAGE);
             namaField.setText("");
             alamatField.setText("");
@@ -309,6 +413,7 @@ public class BankSampahGUI extends JFrame {
             bankEwalletField.setText("");
             noRekeningField.setText("");
             refreshAll();
+            setStatus("Nasabah " + n.getId() + " ditambahkan dan data disimpan.");
         } catch (IllegalArgumentException ex) {
             showError(ex.getMessage());
         }
@@ -325,11 +430,13 @@ public class BankSampahGUI extends JFrame {
             Setoran setoran = bank.setorSampah(nasabahId, namaSampah, berat);
             double saldo = bank.cariNasabah(nasabahId).getSaldo();
             JOptionPane.showMessageDialog(this,
-                    "Setoran berhasil!\nNilai setoran: " + Format.rupiah(setoran.getJumlah())
+                    "Setoran berhasil!\nJenis: " + setoran.getSampah().getNama() + " (" + Format.angka(berat) + " kg)"
+                            + "\nNilai setoran: " + Format.rupiah(setoran.getJumlah())
                             + "\nSaldo sekarang: " + Format.rupiah(saldo),
                     "Berhasil", JOptionPane.INFORMATION_MESSAGE);
             beratField.setText("");
             refreshAll();
+            setStatus("Setoran berhasil disimpan. Saldo " + nasabahId + " diperbarui.");
         } catch (IllegalArgumentException ex) {
             showError(ex.getMessage());
         }
@@ -342,8 +449,9 @@ public class BankSampahGUI extends JFrame {
             double jumlah = parseDouble(jumlahTarikField.getText(), "Jumlah pencairan");
             Nasabah nasabah = bank.cariNasabah(nasabahId);
             int confirm = JOptionPane.showConfirmDialog(this,
-                    "Transfer " + Format.rupiah(jumlah) + " ke\n" + nasabah.getTujuanTransfer()
-                            + "?\nSaldo saat ini: " + Format.rupiah(nasabah.getSaldo()),
+                    "Konfirmasi transfer digital:\n\nJumlah : " + Format.rupiah(jumlah)
+                            + "\nTujuan : " + nasabah.getTujuanTransfer()
+                            + "\nSaldo  : " + Format.rupiah(nasabah.getSaldo()),
                     "Konfirmasi Pencairan", JOptionPane.YES_NO_OPTION);
             if (confirm != JOptionPane.YES_OPTION) {
                 return;
@@ -351,13 +459,14 @@ public class BankSampahGUI extends JFrame {
             Penarikan penarikan = bank.tarikSaldo(nasabahId, jumlah);
             double saldo = bank.cariNasabah(nasabahId).getSaldo();
             JOptionPane.showMessageDialog(this,
-                    "Pencairan berhasil diproses!\nNo. Referensi: " + penarikan.getNoReferensi()
+                    "Pencairan berhasil diproses (transfer digital)!\nNo. Referensi: " + penarikan.getNoReferensi()
                             + "\nTujuan: " + nasabah.getTujuanTransfer()
                             + "\nJumlah: " + Format.rupiah(penarikan.getJumlah())
                             + "\nSaldo sekarang: " + Format.rupiah(saldo),
                     "Berhasil", JOptionPane.INFORMATION_MESSAGE);
             jumlahTarikField.setText("");
             refreshAll();
+            setStatus("Transfer " + penarikan.getNoReferensi() + " berhasil dan tersimpan.");
         } catch (IllegalArgumentException ex) {
             showError(ex.getMessage());
         }
@@ -368,9 +477,11 @@ public class BankSampahGUI extends JFrame {
         refreshNasabahCombos();
         refreshRiwayat();
         refreshLaporan();
+        updateTujuanTransferInfo();
     }
 
     private void refreshNasabahTable() {
+        if (nasabahTableModel == null) return;
         nasabahTableModel.setRowCount(0);
         for (Nasabah n : bank.getDaftarNasabah()) {
             nasabahTableModel.addRow(new Object[]{n.getId(), n.getNama(), n.getAlamat(), n.getNoHp(),
@@ -379,13 +490,15 @@ public class BankSampahGUI extends JFrame {
     }
 
     private void refreshNasabahCombos() {
+        String selSetor = selectedId(setorNasabahCombo);
+        String selTarik = selectedId(tarikNasabahCombo);
+        String selRiwayat = selectedId(riwayatNasabahCombo);
         updateCombo(setorNasabahCombo);
         updateCombo(tarikNasabahCombo);
-        String selectedRiwayat = selectedId(riwayatNasabahCombo);
         updateCombo(riwayatNasabahCombo);
-        if (selectedRiwayat != null) {
-            selectId(riwayatNasabahCombo, selectedRiwayat);
-        }
+        if (selSetor != null) selectId(setorNasabahCombo, selSetor);
+        if (selTarik != null) selectId(tarikNasabahCombo, selTarik);
+        if (selRiwayat != null) selectId(riwayatNasabahCombo, selRiwayat);
     }
 
     private void updateCombo(JComboBox<String> combo) {
@@ -435,7 +548,8 @@ public class BankSampahGUI extends JFrame {
 
         StringBuilder sb = new StringBuilder();
         sb.append("<html><body style='font-family:sans-serif;'>");
-        sb.append("<h2>Laporan Bank Sampah</h2>");
+        sb.append("<h2>Laporan Bank Sampah Digital</h2>");
+        sb.append("<p style='color:#2e7d32'><b>Pencairan dilakukan via transfer digital ke rekening/e-wallet nasabah (bukan tunai).</b></p>");
         sb.append("<table cellspacing='6'>");
         row(sb, "Jumlah nasabah", String.valueOf(bank.getDaftarNasabah().size()));
         row(sb, "Jumlah setoran", String.valueOf(jumlahSetoran));
@@ -455,8 +569,13 @@ public class BankSampahGUI extends JFrame {
             }
             sb.append("</ul>");
         }
+        sb.append("<p style='color:#555'>Data transaksi disimpan otomatis di folder <code>data/</code>.</p>");
         sb.append("</body></html>");
         laporanLabel.setText(sb.toString());
+    }
+
+    private void setStatus(String text) {
+        if (statusLabel != null) statusLabel.setText(text);
     }
 
     private void row(StringBuilder sb, String label, String value) {
@@ -479,6 +598,7 @@ public class BankSampahGUI extends JFrame {
     }
 
     private void selectId(JComboBox<String> combo, String id) {
+        if (combo == null || id == null) return;
         for (int i = 0; i < combo.getItemCount(); i++) {
             String item = combo.getItemAt(i);
             if (item.startsWith(id + " - ")) {
@@ -500,7 +620,7 @@ public class BankSampahGUI extends JFrame {
     }
 
     private void addRow(JPanel panel, GridBagConstraints gbc, int row, String label, java.awt.Component field) {
-        gbc.gridx = 0; gbc.gridy = row; gbc.weightx = 0; gbc.anchor = GridBagConstraints.WEST;
+        gbc.gridx = 0; gbc.gridy = row; gbc.weightx = 0; gbc.anchor = GridBagConstraints.WEST; gbc.fill = GridBagConstraints.NONE;
         panel.add(new JLabel(label), gbc);
         gbc.gridx = 1; gbc.weightx = 1; gbc.fill = GridBagConstraints.HORIZONTAL;
         if (field instanceof JTextField) ((JTextField) field).setColumns(18);
@@ -531,6 +651,7 @@ public class BankSampahGUI extends JFrame {
         table.setRowHeight(26);
         table.setFont(new Font("SansSerif", Font.PLAIN, 13));
         table.getTableHeader().setFont(new Font("SansSerif", Font.BOLD, 13));
+        table.setFillsViewportHeight(true);
     }
 
     private void showError(String message) {

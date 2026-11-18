@@ -12,8 +12,12 @@ public abstract class Transaksi {
     private final LocalDateTime waktu;
 
     public Transaksi(String id) {
+        this(id, LocalDateTime.now());
+    }
+
+    protected Transaksi(String id, LocalDateTime waktu) {
         this.id = id;
-        this.waktu = LocalDateTime.now();
+        this.waktu = waktu == null ? LocalDateTime.now() : waktu;
     }
 
     public String getId() {

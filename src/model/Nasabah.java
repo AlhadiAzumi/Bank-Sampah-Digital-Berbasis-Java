@@ -27,12 +27,20 @@ public class Nasabah {
         if (noRekening == null || noRekening.trim().isEmpty()) {
             throw new IllegalArgumentException("No. rekening/tujuan tidak boleh kosong.");
         }
+        String hp = noHp == null ? "" : noHp.trim();
+        String rek = noRekening.trim();
+        if (!hp.isEmpty() && !hp.matches("\\d+")) {
+            throw new IllegalArgumentException("No. HP harus berupa angka.");
+        }
+        if (!rek.matches("\\d+")) {
+            throw new IllegalArgumentException("No. rekening/tujuan harus berupa angka.");
+        }
         this.id = id;
         this.nama = nama.trim();
         this.alamat = alamat == null ? "" : alamat.trim();
-        this.noHp = noHp == null ? "" : noHp.trim();
+        this.noHp = hp;
         this.bankEwallet = bankEwallet.trim();
-        this.noRekening = noRekening.trim();
+        this.noRekening = rek;
         this.saldo = 0;
         this.riwayat = new ArrayList<>();
     }
@@ -65,7 +73,11 @@ public class Nasabah {
     }
 
     public void setNoHp(String noHp) {
-        this.noHp = noHp == null ? "" : noHp.trim();
+        String hp = noHp == null ? "" : noHp.trim();
+        if (!hp.isEmpty() && !hp.matches("\\d+")) {
+            throw new IllegalArgumentException("No. HP harus berupa angka.");
+        }
+        this.noHp = hp;
     }
 
     public String getBankEwallet() {
@@ -87,7 +99,11 @@ public class Nasabah {
         if (noRekening == null || noRekening.trim().isEmpty()) {
             throw new IllegalArgumentException("No. rekening/tujuan tidak boleh kosong.");
         }
-        this.noRekening = noRekening.trim();
+        String rek = noRekening.trim();
+        if (!rek.matches("\\d+")) {
+            throw new IllegalArgumentException("No. rekening/tujuan harus berupa angka.");
+        }
+        this.noRekening = rek;
     }
 
     public String getTujuanTransfer() {

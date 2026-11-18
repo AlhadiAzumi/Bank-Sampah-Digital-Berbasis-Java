@@ -5,8 +5,7 @@ Aplikasi ini sekarang memiliki **antarmuka GUI (Swing)** untuk memudahkan pengel
 sampah warga, mengonversinya menjadi saldo rupiah, dan melakukan **pencairan saldo secara transfer digital** ke rekening/e-wallet nasabah.
 Mode CLI tetap tersedia sebagai opsi.
 
-Data disimpan **in-memory** menggunakan `ArrayList`, sehingga data akan hilang saat program
-ditutup (tidak memerlukan database).
+Data transaksi disimpan **otomatis (persisten)** ke file CSV di folder `data/` (nasabah, setoran, pencairan, counter), sehingga tidak hilang saat program ditutup. Data juga dimuat otomatis saat aplikasi dijalankan.
 
 ---
 
@@ -17,10 +16,11 @@ Pengelola Bank Sampah sering mencatat setoran warga secara manual. Akibatnya:
 - Nilai rupiah dari sampah sulit dihitung cepat dan konsisten.
 - Saldo tabungan warga rawan salah catat.
 - Riwayat setoran/pencairan tidak transparan dan pencairan tunai sulit dilacak.
-- Laporan total sampah yang berhasil dikelola tidak tersedia.
+- Data hilang/rentan rusak karena tidak tersimpan digital.
 
 Aplikasi ini menyelesaikan masalah tersebut dengan aturan perhitungan otomatis, validasi saldo,
-pencairan saldo lewat transfer digital (dengan nomor referensi), riwayat transaksi, dan laporan.
+pencairan saldo lewat **transfer digital ke rekening/e-wallet nasabah** (dengan nomor referensi),
+riwayat transaksi, laporan, dan **penyimpanan data otomatis** ke file.
 
 ---
 
@@ -28,10 +28,10 @@ pencairan saldo lewat transfer digital (dengan nomor referensi), riwayat transak
 
 | Menu/Tab | Fitur | Keterangan |
 |----------|-------|------------|
-| 1 | Tambah Nasabah | ID otomatis (`N001`, ...), wajib isi data tujuan transfer (Bank/E-Wallet & No. Rekening/Tujuan) |
-| 2 | Lihat Semua Nasabah | Menampilkan data nasabah, rekening tujuan, dan saldo |
+| 1 | Tambah Nasabah | ID otomatis (`N001`, ...), wajib isi tujuan transfer (Bank/E-Wallet & No. Rekening/Tujuan, angka), validasi No. HP & rekening |
+| 2 | Lihat Semua Nasabah | Menampilkan data nasabah, rekening tujuan, saldo, dan fitur **cari/filter nasabah** (GUI) |
 | 3 | Setor Sampah | Input jenis sampah + berat, nilai dihitung otomatis |
-| 4 | Pencairan Saldo (Transfer) | Saldo ditransfer ke rekening/e-wallet terdaftar, menghasilkan No. Referensi (`TRF001`, ...), ditolak jika saldo tidak cukup |
+| 4 | Pencairan Saldo (Transfer) | Saldo ditransfer ke rekening/e-wallet terdaftar, konfirmasi sebelum kirim, No. Referensi (`TRF001`, ...), ditolak jika saldo tidak cukup |
 | 5 | Riwayat Transaksi | Menampilkan setoran & pencairan (termasuk tujuan dan no. referensi) |
 | 6 | Laporan | Total kg per kategori, total nilai setoran, total dana dicairkan, saldo beredar |
 | 7 | Keluar | Menghentikan program (mode CLI) |
@@ -215,6 +215,12 @@ classDiagram
 ```
 project/
 ├── README.md
+├── .gitignore
+├── data/                        (dibuat otomatis, penyimpanan data persisten)
+│   ├── nasabah.csv
+│   ├── setoran.csv
+│   ├── penarikan.csv
+│   └── counters.properties
 ├── bin/                         (hasil kompilasi .class)
 └── src/
     ├── Main.java                (entry point: GUI default, CLI opsional)
@@ -231,7 +237,7 @@ project/
     │   ├── Setoran.java
     │   └── Penarikan.java       (pencairan/transfer saldo)
     ├── service/
-    │   └── BankSampah.java      (logika bisnis + koleksi data)
+    │   └── BankSampah.java      (logika bisnis + koleksi data + persistensi)
     └── util/
         └── Format.java          (format Rupiah & angka)
 ```
@@ -244,8 +250,8 @@ project/
 
 1. `Main` menjalankan `BankSampahGUI.launch()` (default) atau `BankSampahCLI` jika diberi argumen `--cli`.
 2. GUI/CLI membuat objek `BankSampah`.
-3. Konstruktor `BankSampah` mengisi daftar jenis sampah awal (Plastik, Kertas, Logam, Organik).
-4. Pengguna mengelola nasabah, setoran, pencairan saldo (transfer), riwayat, dan laporan.
+3. Konstruktor `BankSampah` mengisi daftar jenis sampah awal dan **memuat data tersimpan** dari folder `data/` (jika ada).
+4. Pengguna mengelola nasabah, setoran, pencairan saldo (transfer), riwayat, dan laporan - **setiap perubahan disimpan otomatis**.
 
 ### Alur Tambah Nasabah
 
@@ -370,11 +376,12 @@ Gagal mencairkan saldo: Saldo tidak cukup. Saldo saat ini: Rp30.400
 ## 9. Aturan Validasi
 
 - Nama nasabah, Bank/E-Wallet, dan No. Rekening/Tujuan tidak boleh kosong.
+- No. HP (jika diisi) dan No. Rekening/Tujuan harus berupa **angka (digit)**.
 - Berat sampah harus lebih dari 0 kg.
 - Jumlah pencairan harus lebih dari 0 dan tidak melebihi saldo.
 - Saldo tidak pernah bernilai negatif.
 - ID nasabah dan jenis sampah harus terdaftar.
-- Setiap pencairan diproses sebagai transfer digital dengan nomor referensi unik.
+- Setiap pencairan diproses sebagai **transfer digital** ke rekening/e-wallet terdaftar dengan **nomor referensi unik**.
 - Input angka yang salah akan ditolak dan diminta ulang (program tidak crash).
 
 ---
@@ -418,8 +425,8 @@ Untuk menunjukkan bahwa desain mudah dikembangkan:
 
 ## 11. Catatan
 
-- Data hanya tersimpan di memori. Jika ingin data permanen, pengembangan berikutnya bisa
-  menambahkan penyimpanan file `.csv`/`.txt` atau database (JDBC).
-- Pencairan saldo dicatat sebagai transfer digital (simulasi) ke rekening/e-wallet nasabah dengan nomor referensi sebagai bukti transaksi.
+- **Persistensi data**: nasabah, transaksi (setoran & pencairan), dan counter ID disimpan otomatis ke file CSV di folder `data/` dan dimuat kembali saat aplikasi dijalankan (tanpa database eksternal).
+- Pencairan saldo dicatat sebagai **transfer digital (simulasi)** ke rekening/e-wallet nasabah dengan nomor referensi sebagai bukti transaksi (bukan tunai).
+- GUI mendukung pencarian/filter nasabah, konfirmasi transfer, dan tampilan tujuan transfer yang jelas.
 - Format Rupiah menggunakan `Locale` Indonesia sehingga tampil seperti `Rp4.000`.
 - Proyek tidak memakai library eksternal, cukup JDK standar.

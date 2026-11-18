@@ -1,5 +1,7 @@
 package model;
 
+import java.time.LocalDateTime;
+
 import util.Format;
 
 public class Penarikan extends Transaksi {
@@ -11,6 +13,14 @@ public class Penarikan extends Transaksi {
 
     public Penarikan(String noReferensi, double jumlah, String bankEwallet, String noRekening, String namaNasabah) {
         super(noReferensi);
+        this.jumlah = jumlah;
+        this.bankEwallet = bankEwallet;
+        this.noRekening = noRekening;
+        this.namaNasabah = namaNasabah;
+    }
+
+    public Penarikan(String noReferensi, LocalDateTime waktu, double jumlah, String bankEwallet, String noRekening, String namaNasabah) {
+        super(noReferensi, waktu);
         this.jumlah = jumlah;
         this.bankEwallet = bankEwallet;
         this.noRekening = noRekening;
