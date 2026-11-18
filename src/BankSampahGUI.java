@@ -356,16 +356,17 @@ public class BankSampahGUI extends JFrame {
         refresh.addActionListener(e -> refreshRiwayat());
         top.add(refresh);
 
-        riwayatTableModel = new DefaultTableModel(new Object[]{"ID/Ref", "Waktu", "Deskripsi"}, 0) {
+        riwayatTableModel = new DefaultTableModel(new Object[]{"ID/Ref", "Waktu", "Nasabah", "Deskripsi"}, 0) {
             public boolean isCellEditable(int row, int column) { return false; }
         };
         JTable table = new JTable(riwayatTableModel);
         styleTable(table);
         table.setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS);
-        if (table.getColumnModel().getColumnCount() >= 3) {
+        if (table.getColumnModel().getColumnCount() >= 4) {
             table.getColumnModel().getColumn(0).setPreferredWidth(90);
-            table.getColumnModel().getColumn(1).setPreferredWidth(150);
-            table.getColumnModel().getColumn(2).setPreferredWidth(520);
+            table.getColumnModel().getColumn(1).setPreferredWidth(140);
+            table.getColumnModel().getColumn(2).setPreferredWidth(170);
+            table.getColumnModel().getColumn(3).setPreferredWidth(430);
         }
 
         panel.add(top, BorderLayout.NORTH);
@@ -492,13 +493,35 @@ public class BankSampahGUI extends JFrame {
     private void refreshNasabahCombos() {
         String selSetor = selectedId(setorNasabahCombo);
         String selTarik = selectedId(tarikNasabahCombo);
-        String selRiwayat = selectedId(riwayatNasabahCombo);
+        String selRiwayatRaw = riwayatNasabahCombo != null && riwayatNasabahCombo.getSelectedItem() != null
+                ? riwayatNasabahCombo.getSelectedItem().toString() : null;
         updateCombo(setorNasabahCombo);
         updateCombo(tarikNasabahCombo);
         updateCombo(riwayatNasabahCombo);
         if (selSetor != null) selectId(setorNasabahCombo, selSetor);
         if (selTarik != null) selectId(tarikNasabahCombo, selTarik);
-        if (selRiwayat != null) selectId(riwayatNasabahCombo, selRiwayat);
+        if (riwayatNasabahCombo != null) {
+            riwayatNasabahCombo.insertItemAt("Semua Nasabah", 0);
+            if (selRiwayatRaw != null && !"Semua Nasabah".equals(selRiwayatRaw)) {
+                String id = selectedId(riwayatNasabahCombo, selRiwayatRaw);
+                if (id != null) {
+                    selectId(riwayatNasabahCombo, id);
+                } else {
+                    riwayatNasabahCombo.setSelectedIndex(0);
+                }
+                if (riwayatNasabahCombo.getSelectedIndex() < 0) {
+                    riwayatNasabahCombo.setSelectedIndex(0);
+                }
+            } else {
+                riwayatNasabahCombo.setSelectedIndex(0);
+            }
+        }
+    }
+
+    private String selectedId(JComboBox<String> combo, String itemText) {
+        if (itemText == null) return null;
+        int idx = itemText.indexOf(" - ");
+        return idx > 0 ? itemText.substring(0, idx).trim() : itemText.trim();
     }
 
     private void updateCombo(JComboBox<String> combo) {
@@ -512,12 +535,35 @@ public class BankSampahGUI extends JFrame {
     private void refreshRiwayat() {
         if (riwayatTableModel == null) return;
         riwayatTableModel.setRowCount(0);
+        if (riwayatNasabahCombo == null || riwayatNasabahCombo.getSelectedItem() == null) return;
+        String sel = riwayatNasabahCombo.getSelectedItem().toString();
+        if ("Semua Nasabah".equals(sel)) {
+            java.util.List<Object[]> rows = new java.util.ArrayList<Object[]>();
+            for (Nasabah n : bank.getDaftarNasabah()) {
+                for (Transaksi t : n.getRiwayat()) {
+                    rows.add(new Object[]{t.getId(), t.getWaktu(), t.getWaktuFormatted(),
+                            n.getId() + " - " + n.getNama(), t.getDeskripsi()});
+                }
+            }
+            java.util.Collections.sort(rows, new java.util.Comparator<Object[]>() {
+                public int compare(Object[] a, Object[] b) {
+                    java.time.LocalDateTime ta = (java.time.LocalDateTime) a[1];
+                    java.time.LocalDateTime tb = (java.time.LocalDateTime) b[1];
+                    return ta.compareTo(tb);
+                }
+            });
+            for (Object[] r : rows) {
+                riwayatTableModel.addRow(new Object[]{r[0], r[2], r[3], r[4]});
+            }
+            return;
+        }
         String id = selectedId(riwayatNasabahCombo);
         if (id == null) return;
         try {
             Nasabah n = bank.cariNasabah(id);
             for (Transaksi t : n.getRiwayat()) {
-                riwayatTableModel.addRow(new Object[]{t.getId(), t.getWaktuFormatted(), t.getDeskripsi()});
+                riwayatTableModel.addRow(new Object[]{t.getId(), t.getWaktuFormatted(),
+                        n.getId() + " - " + n.getNama(), t.getDeskripsi()});
             }
         } catch (IllegalArgumentException ignored) {
         }
