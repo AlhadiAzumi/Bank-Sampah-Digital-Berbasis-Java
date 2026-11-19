@@ -33,6 +33,113 @@ const angka = (value, digits) => new Intl.NumberFormat('id-ID', {
     maximumFractionDigits: digits == null ? 2 : digits
 }).format(Number(value) || 0);
 
+const revealSelector = [
+    '.sky-headline-wrap',
+    '.floating-cards-track > .float-card',
+    '.content-header > *',
+    '.bento-grid > .bento-card',
+    '.grid-dual > .bento-card',
+    '.metrics-grid > .metric',
+    '.summary-row',
+    '.bar-row',
+    '.guide-list > li',
+    '.quick-nav-card',
+    '.data-table tbody > tr:nth-child(-n+12)',
+    '.footer-main > *',
+    '.footer-bottom > *'
+].join(', ');
+
+const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const revealObserver = (!prefersReducedMotion && 'IntersectionObserver' in window)
+    ? new IntersectionObserver((entries, observer) => {
+        entries.forEach((entry) => {
+            if (!entry.isIntersecting) return;
+            entry.target.classList.add('is-visible');
+            observer.unobserve(entry.target);
+        });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' })
+    : null;
+
+function observeReveals(scope = document) {
+    scope.querySelectorAll(revealSelector).forEach((el, index) => {
+        if (el.classList.contains('reveal') || el.classList.contains('is-visible')) return;
+        if (el.closest('[hidden], .hidden')) return;
+        if (!revealObserver) {
+            el.classList.add('is-visible');
+            return;
+        }
+        el.classList.add('reveal');
+        el.style.setProperty('--reveal-delay', (index % 8) * 55 + 'ms');
+        revealObserver.observe(el);
+    });
+}
+
+const numberAnimations = new WeakMap();
+
+function randomizeDigits(text) {
+    return text.replace(/\d/g, () => String(Math.floor(Math.random() * 10)));
+}
+
+function animateNumber(el, target, delay = 0) {
+    if (!el) return;
+    const finalText = String(target);
+    const previous = numberAnimations.get(el);
+    if (previous) cancelAnimationFrame(previous);
+    if (prefersReducedMotion || !/\d/.test(finalText)) {
+        el.textContent = finalText;
+        return;
+    }
+    const slots = Array.from(finalText).map((ch) => /\d/.test(ch));
+    const digitCount = slots.filter(Boolean).length;
+    const start = performance.now() + delay;
+    const duration = 1200;
+    const tick = (now) => {
+        const elapsed = now - start;
+        const progress = elapsed <= 0 ? 0 : Math.min(1, elapsed / duration);
+        const eased = 1 - Math.pow(1 - progress, 3);
+        const locked = Math.floor(eased * digitCount);
+        let seen = 0;
+        el.textContent = Array.from(finalText).map((ch, i) => {
+            if (!slots[i]) return ch;
+            const order = seen++;
+            return order < locked ? ch : String(Math.floor(Math.random() * 10));
+        }).join('');
+        if (elapsed < duration) {
+            numberAnimations.set(el, requestAnimationFrame(tick));
+        } else {
+            el.textContent = finalText;
+            numberAnimations.delete(el);
+        }
+    };
+    el.textContent = randomizeDigits(finalText);
+    numberAnimations.set(el, requestAnimationFrame(tick));
+}
+
+function animateNumbersIn(root, selector, stagger = 70) {
+    if (!root) return;
+    Array.from(root.querySelectorAll(selector)).forEach((el, index) => {
+        animateNumber(el, el.textContent, index * stagger);
+    });
+}
+
+const progressBar = $('#scrollProgress');
+let progressTicking = false;
+
+function updateScrollProgress() {
+    if (!progressBar) return;
+    const max = document.documentElement.scrollHeight - window.innerHeight;
+    const ratio = max > 0 ? Math.min(1, Math.max(0, window.scrollY / max)) : 0;
+    progressBar.style.setProperty('--progress', (ratio * 100).toFixed(2) + '%');
+    progressTicking = false;
+}
+
+window.addEventListener('scroll', () => {
+    if (progressTicking) return;
+    progressTicking = true;
+    requestAnimationFrame(updateScrollProgress);
+}, { passive: true });
+window.addEventListener('resize', updateScrollProgress);
+
 async function api(path, options) {
     const response = await fetch(path, options);
     let data = null;
@@ -276,6 +383,8 @@ async function loadPage(page) {
             state.laporan = await api('/api/laporan');
             renderLaporan(state.laporan);
         }
+        const activePage = $('#page-' + page);
+        if (activePage) observeReveals(activePage);
     } catch (e) {
         toast(e.message, true);
     }
@@ -334,18 +443,18 @@ function grafikAktivitas(items) {
 }
 
 function renderDashboard(d) {
-    if ($('#balanceAmount')) $('#balanceAmount').textContent = rupiah(d.saldoBeredar);
-    if ($('#trendIn')) $('#trendIn').textContent = rupiah(d.totalNilaiSetoran);
-    if ($('#trendOut')) $('#trendOut').textContent = rupiah(d.totalDanaDicairkan);
-    if ($('#navNasabahCount')) $('#navNasabahCount').textContent = d.jumlahNasabah;
+    animateNumber($('#balanceAmount'), rupiah(d.saldoBeredar));
+    animateNumber($('#trendIn'), rupiah(d.totalNilaiSetoran));
+    animateNumber($('#trendOut'), rupiah(d.totalDanaDicairkan));
+    animateNumber($('#navNasabahCount'), d.jumlahNasabah);
     if ($('#balanceChart')) $('#balanceChart').innerHTML = grafikAktivitas(d.terbaru);
 
     // Live update Sky Hero showcase cards
-    if ($('#heroStatSaldo')) $('#heroStatSaldo').textContent = rupiah(d.saldoBeredar);
-    if ($('#heroStatBerat')) $('#heroStatBerat').textContent = angka(d.totalBerat, 1) + ' kg';
-    if ($('#heroStatNasabah')) $('#heroStatNasabah').textContent = d.jumlahNasabah + ' Nasabah';
-    if ($('#heroStatSetoran')) $('#heroStatSetoran').textContent = d.jumlahSetoran + ' Transaksi';
-    if ($('#bentoStatBerat')) $('#bentoStatBerat').textContent = angka(d.totalBerat, 1) + ' kg';
+    animateNumber($('#heroStatSaldo'), rupiah(d.saldoBeredar));
+    animateNumber($('#heroStatBerat'), angka(d.totalBerat, 1) + ' kg');
+    animateNumber($('#heroStatNasabah'), d.jumlahNasabah + ' Nasabah');
+    animateNumber($('#heroStatSetoran'), d.jumlahSetoran + ' Transaksi');
+    animateNumber($('#bentoStatBerat'), angka(d.totalBerat, 1) + ' kg');
 
     if ($('#summaryList')) {
         $('#summaryList').innerHTML = [
@@ -354,6 +463,7 @@ function renderDashboard(d) {
             summaryRow('Dana Dicairkan', rupiah(d.totalDanaDicairkan), d.jumlahPencairan + ' transfer berhasil', 'out', 'rose'),
             summaryRow('Sampah Terkelola', angka(d.totalBerat, 2) + ' kg', 'seluruh kategori aktif', 'grid', 'lime')
         ].join('');
+        animateNumbersIn($('#summaryList'), '.summary-value');
     }
 
     if ($('#dashboardMetrics')) {
@@ -365,6 +475,7 @@ function renderDashboard(d) {
             metric('Dana Dicairkan', rupiah(d.totalDanaDicairkan), d.jumlahPencairan + ' transfer'),
             metric('Saldo Beredar', rupiah(d.saldoBeredar), 'Hak saldo nasabah')
         ].join('');
+        animateNumbersIn($('#dashboardMetrics'), '.metric strong');
     }
 
     if ($('#recentTable')) {
@@ -373,6 +484,7 @@ function renderDashboard(d) {
             '<span class="tag ' + (t.tipe === 'Setoran' ? 'in' : 'out') + '">' + esc(t.tipe) + '</span>' +
             '<div class="muted" style="margin-top:3px;font-size:11px">' + esc(t.deskripsi) + '</div></td>' +
             '<td class="num font-bold">' + rupiah(t.jumlah) + '</td></tr>'));
+        animateNumbersIn($('#recentTable'), 'tbody tr:nth-child(-n+12) td.num', 45);
     }
 
     const maks = d.kategori.reduce((m, k) => Math.max(m, Number(k.berat) || 0), 0) || 1;
@@ -383,6 +495,7 @@ function renderDashboard(d) {
             angka(k.berat, 2) + ' kg</strong></div><div class="bar-track"><div class="bar-fill ' +
             warna[i % warna.length] + '" style="width:' + Math.max(4, (Number(k.berat) / maks) * 100) +
             '%"></div></div></div>').join('') : '<p class="muted" style="text-align:center;padding:16px;">Belum ada setoran sampah tercatat.</p>';
+        animateNumbersIn($('#categoryBars'), '.bar-label strong');
     }
 }
 
@@ -396,6 +509,7 @@ function renderNasabah() {
         '<span class="bank-pill">' + esc(n.tujuanTransfer) + '</span></td><td class="num font-bold">' + rupiah(n.saldo) + '</td><td class="num muted">' +
         n.jumlahTransaksi + '</td></tr>');
     table($('#nasabahTable'), ['ID Nasabah', 'Nama Nasabah', 'Tujuan Transfer', 'Saldo Saat Ini', 'Transaksi'], rows);
+    animateNumbersIn($('#nasabahTable'), 'tbody tr:nth-child(-n+12) td.num', 45);
 }
 
 function updateEstimate() {
@@ -440,6 +554,7 @@ async function loadRiwayat() {
             '</span></td><td class="muted">' + esc(t.deskripsi) + '</td><td class="num font-bold">' + rupiah(t.jumlah) +
             '</td><td>' + (t.struk ? '<button type="button" class="link-btn" data-struk="' + esc(t.struk) + '">Lihat Struk</button>' : '-') +
             '</td></tr>'));
+    animateNumbersIn($('#riwayatTable'), 'tbody tr:nth-child(-n+12) td.num', 45);
 }
 
 function renderJenis() {
@@ -447,6 +562,7 @@ function renderJenis() {
         '<tr><td><strong>' + esc(s.nama) + '</strong></td><td class="num font-bold">' + rupiah(s.hargaPerKg) +
         '</td><td class="muted">' + esc(s.kategori) + '</td><td><span class="tag neutral">' +
         esc(s.aturanLabel) + '</span></td></tr>'));
+    animateNumbersIn($('#jenisTable'), 'tbody tr:nth-child(-n+12) td.num', 45);
     isiSelect($('#hargaSampah'), state.sampah, (s) => s.nama + ' (' + rupiah(s.hargaPerKg) + '/kg)',
         (s) => s.nama, 'Pilih jenis sampah');
 }
@@ -459,10 +575,12 @@ function renderLaporan(l) {
             metric('Saldo Beredar', rupiah(l.saldoBeredar), l.jumlahNasabah + ' nasabah aktif'),
             metric('Total Berat', angka(l.totalBerat, 2) + ' kg', 'Akumulasi sampah')
         ].join('');
+        animateNumbersIn($('#laporanMetrics'), '.metric strong');
     }
     table($('#laporanTable'), ['Kategori Sampah', 'Total Berat (kg)', 'Total Nilai (Rp)'], l.kategori.map((k) =>
         '<tr><td><strong>' + esc(k.nama) + '</strong></td><td class="num">' + angka(k.berat, 2) + ' kg' +
         '</td><td class="num font-bold">' + rupiah(k.nilai) + '</td></tr>'));
+    animateNumbersIn($('#laporanTable'), 'tbody tr:nth-child(-n+12) td.num', 45);
 }
 
 // Navigation Handlers
@@ -666,4 +784,6 @@ $('#exportRiwayat').addEventListener('click', () => { window.location.href = '/a
 $('#exportLaporan').addEventListener('click', () => { window.location.href = '/api/export/laporan'; });
 
 // Start directly on Dashboard
+observeReveals();
+updateScrollProgress();
 go('dashboard');

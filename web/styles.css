@@ -625,6 +625,62 @@ a {
     to { opacity: 1; transform: none; }
 }
 
+/* ================= SCROLL REVEAL ================= */
+.scroll-progress {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    z-index: 120;
+    pointer-events: none;
+    background: transparent;
+}
+
+.scroll-progress span {
+    display: block;
+    width: var(--progress, 0%);
+    height: 100%;
+    border-radius: 0 999px 999px 0;
+    background: var(--blue-gradient);
+    box-shadow: 0 0 12px rgba(2, 132, 199, 0.45);
+    transition: width 0.12s linear;
+}
+
+.card-hero-num,
+.cyan-value,
+.float-big-num,
+.bento-lime-num,
+.nav-count,
+.trend-pill b,
+.summary-value,
+.bar-label strong,
+.data-table td.num {
+    font-variant-numeric: tabular-nums;
+}
+
+.reveal {
+    opacity: 0;
+}
+
+.reveal:not(.float-card) {
+    transform: translateY(18px);
+}
+
+.reveal:not(.float-card),
+.float-card.reveal {
+    transition: opacity 0.7s ease var(--reveal-delay, 0ms),
+                transform 0.8s cubic-bezier(0.16, 1, 0.3, 1) var(--reveal-delay, 0ms);
+}
+
+.reveal.is-visible {
+    opacity: 1;
+}
+
+.reveal:not(.float-card).is-visible {
+    transform: none;
+}
+
 /* ================= BENTO GRID ================= */
 .bento-grid {
     display: grid;
@@ -1954,5 +2010,22 @@ select {
     .footer-bottom {
         flex-direction: column;
         align-items: flex-start;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html {
+        scroll-behavior: auto;
+    }
+    .page,
+    .reveal,
+    .reveal.is-visible {
+        animation: none !important;
+        transition: none !important;
+        transform: none !important;
+        opacity: 1 !important;
+    }
+    .scroll-progress span {
+        transition: none;
     }
 }
