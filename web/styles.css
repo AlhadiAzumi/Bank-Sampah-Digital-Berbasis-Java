@@ -1310,19 +1310,19 @@ select {
 .app-footer {
     background: #ffffff;
     border-top: 1px solid var(--line);
-    padding: 24px;
+    padding: 40px 24px 20px;
 }
 
-.footer-inner {
+.footer-main {
     max-width: 1240px;
     margin: 0 auto;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 12px;
-    font-size: 12px;
-    color: var(--text-muted);
+    display: grid;
+    grid-template-columns: 1.8fr repeat(3, 1fr);
+    gap: 36px;
+}
+
+.footer-intro {
+    max-width: 360px;
 }
 
 .footer-brand {
@@ -1331,6 +1331,109 @@ select {
     gap: 8px;
     font-weight: 700;
     color: var(--text-main);
+}
+
+.footer-description {
+    margin: 14px 0 18px;
+    font-size: 12px;
+    line-height: 1.7;
+    color: var(--text-muted);
+}
+
+.footer-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.footer-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-radius: var(--radius-pill);
+    background: var(--surface-subtle);
+    border: 1px solid var(--line-subtle);
+    font-size: 10.5px;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.footer-badge-icon {
+    width: 13px;
+    height: 13px;
+    color: var(--green);
+}
+
+.footer-column {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+.footer-heading {
+    margin: 0 0 6px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-main);
+}
+
+.footer-link {
+    background: none;
+    border: 0;
+    padding: 0;
+    font-size: 12px;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: color 0.2s ease;
+}
+
+.footer-link:hover {
+    color: var(--sky-blue);
+}
+
+.footer-info {
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--text-muted);
+}
+
+.footer-info code {
+    padding: 1px 5px;
+    border-radius: 6px;
+    background: var(--surface-hover);
+    font-size: 11px;
+    color: var(--text-main);
+}
+
+.footer-bottom {
+    max-width: 1240px;
+    margin: 32px auto 0;
+    padding-top: 18px;
+    border-top: 1px solid var(--line-subtle);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    font-size: 11px;
+    color: var(--text-faint);
+}
+
+.footer-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    color: var(--text-muted);
+}
+
+.footer-status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 0 3px var(--green-soft);
 }
 
 /* ================= MODAL & TOAST ================= */
@@ -1825,6 +1928,14 @@ select {
     .form-inputs-grid {
         grid-template-columns: 1fr;
     }
+    .footer-main {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 28px;
+    }
+    .footer-intro {
+        grid-column: 1 / -1;
+        max-width: none;
+    }
 }
 
 @media (max-width: 540px) {
@@ -1836,5 +1947,12 @@ select {
     }
     .card-top {
         flex-direction: column;
+    }
+    .footer-main {
+        grid-template-columns: 1fr;
+    }
+    .footer-bottom {
+        flex-direction: column;
+        align-items: flex-start;
     }
 }
