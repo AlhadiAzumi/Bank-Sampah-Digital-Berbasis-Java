@@ -146,7 +146,7 @@ public class BankSampahGUI extends JFrame {
         JPanel footer = new JPanel(new BorderLayout());
         footer.setBackground(new Color(235, 238, 242));
         footer.setBorder(BorderFactory.createEmptyBorder(6, 12, 6, 12));
-        statusLabel = new JLabel("Data tersimpan otomatis ke folder data/ (persisten). Struk tersimpan di folder struk/.");
+        statusLabel = new JLabel("Data tersimpan otomatis ke folder data/ (persisten). Struk digital tersimpan di folder struk/.");
         statusLabel.setFont(new Font("SansSerif", Font.PLAIN, 12));
         statusLabel.setForeground(new Color(70, 80, 90));
         footer.add(statusLabel, BorderLayout.WEST);
@@ -176,7 +176,7 @@ public class BankSampahGUI extends JFrame {
         infoCard.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(new Color(220, 225, 230)),
                 BorderFactory.createEmptyBorder(12, 14, 12, 14)));
-        JLabel info = new JLabel("<html><b>Info</b><br/>Data & jenis sampah tersimpan di <code>data/</code>.<br/>Struk transfer di <code>struk/</code>.</html>");
+        JLabel info = new JLabel("<html><b>Info</b><br/>Data & jenis sampah tersimpan di <code>data/</code>.<br/>Struk digital di <code>struk/</code>.</html>");
         info.setFont(new Font("SansSerif", Font.PLAIN, 13));
         infoCard.add(info, BorderLayout.CENTER);
         grid.add(infoCard);
@@ -382,7 +382,7 @@ public class BankSampahGUI extends JFrame {
         gbc.gridx = 1; gbc.gridy = 4; gbc.anchor = GridBagConstraints.EAST; gbc.fill = GridBagConstraints.NONE; gbc.weightx = 0;
         card.add(tarikBtn, gbc);
 
-        JLabel info = new JLabel("Setelah berhasil, struk bukti transfer (.txt) disimpan otomatis di folder struk/.");
+        JLabel info = new JLabel("Setelah berhasil, struk digital (.html) disimpan otomatis di folder struk/ dan dapat dibuka di browser.");
         info.setForeground(new Color(90, 100, 110));
         gbc.gridx = 0; gbc.gridy = 5; gbc.gridwidth = 2; gbc.anchor = GridBagConstraints.WEST; gbc.fill = GridBagConstraints.HORIZONTAL; gbc.weightx = 1;
         card.add(info, gbc);
@@ -592,7 +592,7 @@ public class BankSampahGUI extends JFrame {
             String strukInfo = "";
             try {
                 struk = bank.buatStrukTransfer(nasabah, penarikan, saldoSisa);
-                strukInfo = "\nStruk: " + struk.toString();
+                strukInfo = "\nStruk digital: " + struk.toAbsolutePath();
             } catch (Exception ex) {
                 strukInfo = "\n(Struk gagal disimpan: " + ex.getMessage() + ")";
             }
@@ -863,7 +863,7 @@ public class BankSampahGUI extends JFrame {
         StringBuilder sb = new StringBuilder();
         sb.append("<html><body style='font-family:sans-serif;'>");
         sb.append("<h2>Laporan TrashChain</h2>");
-        sb.append("<p style='color:#2e7d32'><b>Pencairan = transfer digital (bukan tunai) + No. Referensi + struk di folder struk/.</b></p>");
+        sb.append("<p style='color:#2e7d32'><b>Pencairan = transfer digital (bukan tunai) + No. Referensi + struk HTML di folder struk/.</b></p>");
         sb.append("<table cellspacing='6'>");
         row(sb, "Jumlah nasabah", String.valueOf(bank.getDaftarNasabah().size()));
         row(sb, "Jumlah setoran", String.valueOf(jumlahSetoran));

@@ -133,8 +133,8 @@ public class WebServer {
                             form.get("kategori"), form.get("aturan"));
                     sendJson(exchange, 200, "{\"ok\":true,\"sampah\":" + sampahJson(s) + "}");
                 } else if (path.equals("/api/sampah/harga")) {
-                    bank.updateHargaSampah(form.get("nama"), angka(form, "hargaPerKg", "Harga/kg"));
-                    sendJson(exchange, 200, "{\"ok\":true}");
+                    Sampah diperbarui = bank.updateHargaSampah(form.get("nama"), angka(form, "hargaPerKg", "Harga/kg"));
+                    sendJson(exchange, 200, "{\"ok\":true,\"sampah\":" + sampahJson(diperbarui) + "}");
                 } else if (path.equals("/api/setoran")) {
                     String id = form.get("idNasabah");
                     Setoran setoran = bank.setorSampah(id, form.get("namaSampah"),
@@ -156,6 +156,8 @@ public class WebServer {
                     } catch (RuntimeException ignored) {
                     }
                     sendJson(exchange, 200, "{\"ok\":true,\"ref\":" + q(penarikan.getNoReferensi())
+                            + ",\"waktu\":" + q(penarikan.getWaktuFormatted())
+                            + ",\"nama\":" + q(nasabah.getNama())
                             + ",\"jumlah\":" + nilai(penarikan.getJumlah())
                             + ",\"tujuan\":" + q(nasabah.getTujuanTransfer())
                             + ",\"saldoSisa\":" + nilai(sisa)
@@ -362,7 +364,8 @@ public class WebServer {
 
     private String transaksiJson(Nasabah n, Transaksi t) {
         boolean setoran = t instanceof Setoran;
-        String struk = setoran ? "" : "/api/struk/" + t.getId();
+        String struk = (!setoran && Files.exists(Paths.get("struk", "Struk_" + t.getId() + ".html")))
+                ? "/api/struk/" + t.getId() : "";
         return "{\"id\":" + q(t.getId())
                 + ",\"waktu\":" + q(t.getWaktuFormatted())
                 + ",\"idNasabah\":" + q(n.getId())
@@ -439,354 +442,12 @@ public class WebServer {
             sendError(exchange, 400, "Nomor referensi tidak valid.");
             return;
         }
-        Path file = Paths.get("struk", "Struk_" + ref + ".txt");
+        Path file = Paths.get("struk", "Struk_" + ref + ".html");
         if (!Files.exists(file)) {
             sendError(exchange, 404, "Struk " + ref + " tidak ditemukan.");
             return;
         }
-
-        Map<String, String> query = parseQuery(exchange.getRequestURI().getQuery());
-        String format = query.get("format");
-        if ("raw".equalsIgnoreCase(format) || "txt".equalsIgnoreCase(format)) {
-            send(exchange, 200, "text/plain; charset=utf-8", Files.readAllBytes(file), null);
-            return;
-        }
-
-        List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
-        Map<String, String> data = new LinkedHashMap<String, String>();
-        for (String line : lines) {
-            int colon = line.indexOf(':');
-            if (colon > 0) {
-                String k = line.substring(0, colon).trim();
-                String v = line.substring(colon + 1).trim();
-                data.put(k, v);
-            }
-        }
-
-        String noRef = data.getOrDefault("No. Referensi", ref);
-        String waktu = data.getOrDefault("Waktu", "-");
-        String nasabah = data.getOrDefault("Nasabah", "-");
-        String tujuan = data.getOrDefault("Tujuan", "-");
-        String jumlah = data.getOrDefault("Jumlah", "Rp0");
-        String saldoSisa = data.getOrDefault("Saldo Sisa", "Rp0");
-        String status = data.getOrDefault("Status", "BERHASIL (Transfer Digital)");
-
-        if ("json".equalsIgnoreCase(format)) {
-            String json = "{\"ref\":" + q(noRef)
-                    + ",\"waktu\":" + q(waktu)
-                    + ",\"nasabah\":" + q(nasabah)
-                    + ",\"tujuan\":" + q(tujuan)
-                    + ",\"jumlah\":" + q(jumlah)
-                    + ",\"saldoSisa\":" + q(saldoSisa)
-                    + ",\"status\":" + q(status) + "}";
-            sendJson(exchange, 200, json);
-            return;
-        }
-
-        String html = renderStrukHtml(noRef, waktu, nasabah, tujuan, jumlah, saldoSisa, status);
-        send(exchange, 200, "text/html; charset=utf-8", html.getBytes(StandardCharsets.UTF_8), null);
-    }
-
-    private static String renderStrukHtml(String ref, String waktu, String nasabah, String tujuan,
-                                         String jumlah, String saldoSisa, String status) {
-        return "<!DOCTYPE html>\n"
-                + "<html lang=\"id\">\n"
-                + "<head>\n"
-                + "  <meta charset=\"UTF-8\">\n"
-                + "  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n"
-                + "  <title>Struk Digital " + escHtml(ref) + " - TrashChain</title>\n"
-                + "  <link rel=\"preconnect\" href=\"https://fonts.googleapis.com\">\n"
-                + "  <link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin>\n"
-                + "  <link href=\"https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap\" rel=\"stylesheet\">\n"
-                + "  <style>\n"
-                + "    :root {\n"
-                + "      --bg-gradient: linear-gradient(180deg, #1b6fc9 0%, #4da2f0 32%, #b5ddfd 68%, #f0f7fe 100%);\n"
-                + "      --card-bg: #ffffff;\n"
-                + "      --text-main: #0f172a;\n"
-                + "      --text-muted: #64748b;\n"
-                + "      --line: #e2e8f0;\n"
-                + "      --sky-blue: #0284c7;\n"
-                + "      --green-badge: #059669;\n"
-                + "      --green-bg: #ecfdf5;\n"
-                + "      --lime-neon: #d2f802;\n"
-                + "      --radius: 22px;\n"
-                + "      --shadow: 0 24px 60px -15px rgba(15, 23, 42, 0.18), 0 10px 24px -10px rgba(15, 23, 42, 0.1);\n"
-                + "    }\n"
-                + "    * { box-sizing: border-box; margin: 0; padding: 0; }\n"
-                + "    body {\n"
-                + "      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;\n"
-                + "      min-height: 100vh;\n"
-                + "      background: var(--bg-gradient);\n"
-                + "      background-attachment: fixed;\n"
-                + "      display: flex;\n"
-                + "      flex-direction: column;\n"
-                + "      align-items: center;\n"
-                + "      justify-content: center;\n"
-                + "      padding: 32px 16px;\n"
-                + "      color: var(--text-main);\n"
-                + "      -webkit-font-smoothing: antialiased;\n"
-                + "    }\n"
-                + "    .receipt-container {\n"
-                + "      width: min(480px, 100%);\n"
-                + "      background: var(--card-bg);\n"
-                + "      border-radius: var(--radius);\n"
-                + "      box-shadow: var(--shadow);\n"
-                + "      border: 1px solid rgba(255, 255, 255, 0.8);\n"
-                + "      overflow: hidden;\n"
-                + "      position: relative;\n"
-                + "    }\n"
-                + "    .receipt-top {\n"
-                + "      padding: 30px 28px 20px;\n"
-                + "      text-align: center;\n"
-                + "      background: #fafcff;\n"
-                + "    }\n"
-                + "    .receipt-logo {\n"
-                + "      display: inline-flex;\n"
-                + "      align-items: center;\n"
-                + "      gap: 10px;\n"
-                + "      margin-bottom: 16px;\n"
-                + "    }\n"
-                + "    .receipt-logo img {\n"
-                + "      height: 38px;\n"
-                + "      width: auto;\n"
-                + "      display: block;\n"
-                + "    }\n"
-                + "    .receipt-logo-title {\n"
-                + "      font-size: 17px;\n"
-                + "      font-weight: 800;\n"
-                + "      color: var(--text-main);\n"
-                + "      letter-spacing: -0.02em;\n"
-                + "    }\n"
-                + "    .receipt-logo-sub {\n"
-                + "      font-size: 11px;\n"
-                + "      font-weight: 600;\n"
-                + "      color: var(--sky-blue);\n"
-                + "      text-transform: uppercase;\n"
-                + "      letter-spacing: 0.05em;\n"
-                + "    }\n"
-                + "    .receipt-status {\n"
-                + "      display: inline-flex;\n"
-                + "      align-items: center;\n"
-                + "      gap: 6px;\n"
-                + "      padding: 6px 14px;\n"
-                + "      border-radius: 999px;\n"
-                + "      background: var(--green-bg);\n"
-                + "      color: var(--green-badge);\n"
-                + "      font-size: 12px;\n"
-                + "      font-weight: 700;\n"
-                + "      letter-spacing: 0.02em;\n"
-                + "      margin-bottom: 14px;\n"
-                + "    }\n"
-                + "    .receipt-status-dot {\n"
-                + "      width: 8px;\n"
-                + "      height: 8px;\n"
-                + "      border-radius: 50%;\n"
-                + "      background: var(--green-badge);\n"
-                + "    }\n"
-                + "    .receipt-amount-label {\n"
-                + "      font-size: 12px;\n"
-                + "      font-weight: 600;\n"
-                + "      color: var(--text-muted);\n"
-                + "      text-transform: uppercase;\n"
-                + "      letter-spacing: 0.04em;\n"
-                + "      margin-bottom: 4px;\n"
-                + "    }\n"
-                + "    .receipt-amount {\n"
-                + "      font-size: 34px;\n"
-                + "      font-weight: 800;\n"
-                + "      letter-spacing: -0.03em;\n"
-                + "      color: var(--text-main);\n"
-                + "    }\n"
-                + "    .tear-separator {\n"
-                + "      position: relative;\n"
-                + "      height: 20px;\n"
-                + "      background: #fafcff;\n"
-                + "      overflow: hidden;\n"
-                + "    }\n"
-                + "    .tear-separator::before {\n"
-                + "      content: '';\n"
-                + "      position: absolute;\n"
-                + "      top: 50%;\n"
-                + "      left: 20px;\n"
-                + "      right: 20px;\n"
-                + "      border-top: 2px dashed #cbd5e1;\n"
-                + "    }\n"
-                + "    .tear-notch-left, .tear-notch-right {\n"
-                + "      position: absolute;\n"
-                + "      top: 50%;\n"
-                + "      width: 20px;\n"
-                + "      height: 20px;\n"
-                + "      border-radius: 50%;\n"
-                + "      background: #3c91e6;\n"
-                + "      transform: translateY(-50%);\n"
-                + "      z-index: 2;\n"
-                + "    }\n"
-                + "    .tear-notch-left { left: -10px; }\n"
-                + "    .tear-notch-right { right: -10px; }\n"
-                + "    .receipt-body {\n"
-                + "      padding: 16px 28px 24px;\n"
-                + "      background: #ffffff;\n"
-                + "    }\n"
-                + "    .receipt-grid {\n"
-                + "      display: flex;\n"
-                + "      flex-direction: column;\n"
-                + "      gap: 12px;\n"
-                + "    }\n"
-                + "    .receipt-row {\n"
-                + "      display: flex;\n"
-                + "      justify-content: space-between;\n"
-                + "      align-items: flex-start;\n"
-                + "      gap: 12px;\n"
-                + "      font-size: 13px;\n"
-                + "    }\n"
-                + "    .receipt-row-label {\n"
-                + "      color: var(--text-muted);\n"
-                + "      font-weight: 500;\n"
-                + "      flex-shrink: 0;\n"
-                + "    }\n"
-                + "    .receipt-row-value {\n"
-                + "      color: var(--text-main);\n"
-                + "      font-weight: 700;\n"
-                + "      text-align: right;\n"
-                + "      word-break: break-word;\n"
-                + "    }\n"
-                + "    .ref-badge {\n"
-                + "      display: inline-block;\n"
-                + "      padding: 3px 8px;\n"
-                + "      border-radius: 6px;\n"
-                + "      background: #f1f5f9;\n"
-                + "      color: var(--sky-blue);\n"
-                + "      font-family: 'JetBrains Mono', monospace;\n"
-                + "      font-size: 12px;\n"
-                + "      font-weight: 700;\n"
-                + "    }\n"
-                + "    .receipt-foot {\n"
-                + "      margin-top: 18px;\n"
-                + "      padding-top: 14px;\n"
-                + "      border-top: 1px solid var(--line);\n"
-                + "      text-align: center;\n"
-                + "      font-size: 11px;\n"
-                + "      color: var(--text-muted);\n"
-                + "      line-height: 1.5;\n"
-                + "    }\n"
-                + "    .receipt-actions {\n"
-                + "      margin-top: 20px;\n"
-                + "      display: flex;\n"
-                + "      gap: 10px;\n"
-                + "      width: min(480px, 100%);\n"
-                + "    }\n"
-                + "    .btn-action {\n"
-                + "      flex: 1;\n"
-                + "      display: inline-flex;\n"
-                + "      align-items: center;\n"
-                + "      justify-content: center;\n"
-                + "      gap: 8px;\n"
-                + "      padding: 13px 18px;\n"
-                + "      border-radius: 14px;\n"
-                + "      font-size: 13px;\n"
-                + "      font-weight: 700;\n"
-                + "      cursor: pointer;\n"
-                + "      text-decoration: none;\n"
-                + "      border: none;\n"
-                + "      transition: transform 0.15s ease, box-shadow 0.15s ease;\n"
-                + "    }\n"
-                + "    .btn-print {\n"
-                + "      background: var(--lime-neon);\n"
-                + "      color: #0f172a;\n"
-                + "      box-shadow: 0 4px 14px rgba(210, 248, 2, 0.4);\n"
-                + "    }\n"
-                + "    .btn-back {\n"
-                + "      background: #ffffff;\n"
-                + "      color: var(--text-main);\n"
-                + "      box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);\n"
-                + "    }\n"
-                + "    .btn-action:hover { transform: translateY(-1px); }\n"
-                + "    @media print {\n"
-                + "      body { background: #ffffff !important; padding: 0 !important; }\n"
-                + "      .receipt-container { box-shadow: none !important; border: 1px solid #cbd5e1 !important; width: 100% !important; max-width: 500px !important; margin: 0 auto !important; }\n"
-                + "      .receipt-actions { display: none !important; }\n"
-                + "      .tear-notch-left, .tear-notch-right { display: none !important; }\n"
-                + "    }\n"
-                + "  </style>\n"
-                + "</head>\n"
-                + "<body>\n"
-                + "  <div class=\"receipt-container\">\n"
-                + "    <div class=\"receipt-top\">\n"
-                + "      <div class=\"receipt-logo\">\n"
-                + "        <img src=\"/logo-mark.png\" alt=\"TrashChain Logo\" onerror=\"this.style.display='none'\">\n"
-                + "        <div>\n"
-                + "          <div class=\"receipt-logo-title\">TrashChain</div>\n"
-                + "          <div class=\"receipt-logo-sub\">Bank Sampah Digital</div>\n"
-                + "        </div>\n"
-                + "      </div>\n"
-                + "      <div>\n"
-                + "        <span class=\"receipt-status\">\n"
-                + "          <span class=\"receipt-status-dot\"></span>\n"
-                + "          " + escHtml(status) + "\n"
-                + "        </span>\n"
-                + "      </div>\n"
-                + "      <div class=\"receipt-amount-label\">Jumlah Dana Dicairkan</div>\n"
-                + "      <div class=\"receipt-amount\">" + escHtml(jumlah) + "</div>\n"
-                + "    </div>\n"
-                + "\n"
-                + "    <div class=\"tear-separator\">\n"
-                + "      <div class=\"tear-notch-left\"></div>\n"
-                + "      <div class=\"tear-notch-right\"></div>\n"
-                + "    </div>\n"
-                + "\n"
-                + "    <div class=\"receipt-body\">\n"
-                + "      <div class=\"receipt-grid\">\n"
-                + "        <div class=\"receipt-row\">\n"
-                + "          <span class=\"receipt-row-label\">No. Referensi</span>\n"
-                + "          <span class=\"receipt-row-value\"><span class=\"ref-badge\">" + escHtml(ref) + "</span></span>\n"
-                + "        </div>\n"
-                + "        <div class=\"receipt-row\">\n"
-                + "          <span class=\"receipt-row-label\">Waktu Transaksi</span>\n"
-                + "          <span class=\"receipt-row-value\">" + escHtml(waktu) + "</span>\n"
-                + "        </div>\n"
-                + "        <div class=\"receipt-row\">\n"
-                + "          <span class=\"receipt-row-label\">Nasabah</span>\n"
-                + "          <span class=\"receipt-row-value\">" + escHtml(nasabah) + "</span>\n"
-                + "        </div>\n"
-                + "        <div class=\"receipt-row\">\n"
-                + "          <span class=\"receipt-row-label\">Rekening / E-Wallet</span>\n"
-                + "          <span class=\"receipt-row-value\">" + escHtml(tujuan) + "</span>\n"
-                + "        </div>\n"
-                + "        <div class=\"receipt-row\">\n"
-                + "          <span class=\"receipt-row-label\">Sisa Saldo Nasabah</span>\n"
-                + "          <span class=\"receipt-row-value\" style=\"color:var(--green-badge);\">" + escHtml(saldoSisa) + "</span>\n"
-                + "        </div>\n"
-                + "        <div class=\"receipt-row\">\n"
-                + "          <span class=\"receipt-row-label\">Jenis Layanan</span>\n"
-                + "          <span class=\"receipt-row-value\">Pencairan Saldo Digital</span>\n"
-                + "        </div>\n"
-                + "      </div>\n"
-                + "\n"
-                + "      <div class=\"receipt-foot\">\n"
-                + "        Dokumen digital ini diterbitkan secara sah oleh sistem TrashChain Bank Sampah Digital dan berlaku sebagai bukti transaksi resmi.\n"
-                + "      </div>\n"
-                + "    </div>\n"
-                + "  </div>\n"
-                + "\n"
-                + "  <div class=\"receipt-actions\">\n"
-                + "    <button type=\"button\" class=\"btn-action btn-print\" onclick=\"window.print()\">\n"
-                + "      Cetak / Simpan PDF\n"
-                + "    </button>\n"
-                + "    <a href=\"/\" class=\"btn-action btn-back\">\n"
-                + "      Kembali ke Dashboard\n"
-                + "    </a>\n"
-                + "  </div>\n"
-                + "</body>\n"
-                + "</html>\n";
-    }
-
-    private static String escHtml(String s) {
-        if (s == null) return "";
-        return s.replace("&", "&amp;")
-                .replace("<", "&lt;")
-                .replace(">", "&gt;")
-                .replace("\"", "&quot;")
-                .replace("'", "&#39;");
+        send(exchange, 200, "text/html; charset=utf-8", Files.readAllBytes(file), null);
     }
 
     private static LocalDateTime awalTanggal(String s) {

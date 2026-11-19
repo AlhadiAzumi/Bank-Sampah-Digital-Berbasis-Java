@@ -30,6 +30,7 @@ import model.SampahKustom;
 import model.Setoran;
 import model.Transaksi;
 import util.Format;
+import util.StrukHtml;
 
 public class BankSampah {
 
@@ -117,13 +118,14 @@ public class BankSampah {
         return sampah;
     }
 
-    public void updateHargaSampah(String nama, double hargaPerKg) {
+    public Sampah updateHargaSampah(String nama, double hargaPerKg) {
         if (hargaPerKg <= 0) {
             throw new IllegalArgumentException("Harga per kg harus lebih dari 0.");
         }
         Sampah sampah = cariSampah(nama);
         sampah.setHargaPerKg(hargaPerKg);
         simpanSampahQuiet();
+        return sampah;
     }
 
     public List<Nasabah> getDaftarNasabah() {
@@ -183,22 +185,13 @@ public class BankSampah {
             if (!Files.exists(STRUK_DIR)) {
                 Files.createDirectories(STRUK_DIR);
             }
-            Path file = STRUK_DIR.resolve("Struk_" + penarikan.getNoReferensi() + ".txt");
+            Path file = STRUK_DIR.resolve("Struk_" + penarikan.getNoReferensi() + ".html");
+            String html = StrukHtml.render(penarikan.getNoReferensi(), penarikan.getWaktuFormatted(),
+                    nasabah.getNama() + " (" + nasabah.getId() + ")",
+                    nasabah.getTujuanTransfer(), Format.rupiah(penarikan.getJumlah()),
+                    Format.rupiah(saldoSisa), "BERHASIL · TRANSFER DIGITAL");
             try (BufferedWriter w = Files.newBufferedWriter(file, StandardCharsets.UTF_8)) {
-                w.write("========================================"); w.newLine();
-                w.write("      BUKTI PENCAIRAN SALDO DIGITAL     "); w.newLine();
-                w.write("           BANK SAMPAH DIGITAL          "); w.newLine();
-                w.write("========================================"); w.newLine();
-                w.write("No. Referensi : " + penarikan.getNoReferensi()); w.newLine();
-                w.write("Waktu         : " + penarikan.getWaktuFormatted()); w.newLine();
-                w.write("Nasabah       : " + nasabah.getNama() + " (" + nasabah.getId() + ")"); w.newLine();
-                w.write("Tujuan        : " + nasabah.getTujuanTransfer()); w.newLine();
-                w.write("Jumlah        : " + Format.rupiah(penarikan.getJumlah())); w.newLine();
-                w.write("Saldo Sisa    : " + Format.rupiah(saldoSisa)); w.newLine();
-                w.write("----------------------------------------"); w.newLine();
-                w.write("Status        : BERHASIL (Transfer Digital)"); w.newLine();
-                w.write("========================================"); w.newLine();
-                w.write("Simpan bukti ini sebagai arsip transaksi."); w.newLine();
+                w.write(html);
             }
             return file;
         } catch (IOException e) {

@@ -14,7 +14,7 @@ Data transaksi, nasabah, counter, dan **jenis sampah** disimpan **otomatis (pers
 | Dashboard | Ringkasan | Total nasabah, setoran, pencairan, sampah terkelola (kg), nilai setoran, dana dicairkan, saldo beredar |
 | Nasabah | Kelola nasabah | ID otomatis (`N001`), wajib isi tujuan transfer (Bank/E-Wallet & No. Rekening angka), cari/filter nasabah |
 | Setor Sampah | Setoran | Pilih nasabah & jenis sampah, input berat, nilai dihitung otomatis (polimorfisme + aturan bonus) |
-| Pencairan Saldo | Transfer digital | Konfirmasi transfer ke rekening/e-wallet terdaftar, No. Referensi (`TRF001`), **struk bukti `.txt`** otomatis di folder `struk/` |
+| Pencairan Saldo | Transfer digital | Konfirmasi transfer ke rekening/e-wallet terdaftar, No. Referensi (`TRF001`), **struk digital `.html`** modern otomatis di folder `struk/` (bisa dicetak/Simpan PDF) |
 | Riwayat | Riwayat transaksi | Tampil per nasabah / **Semua Nasabah**, filter jenis (setoran/pencairan), rentang tanggal, pencarian, **ekspor CSV** |
 | Jenis Sampah | Kelola sampah | Tambah jenis baru & ubah harga/kg dari UI, tersimpan persisten (`data/sampah.csv`) |
 | Laporan | Laporan | Rekap per kategori, total nilai setoran/dicairkan, saldo beredar, **ekspor laporan CSV** |
@@ -41,7 +41,7 @@ project/
   web/                 (frontend website: index.html, styles.css, app.js)
   data/                (dibuat otomatis, persisten, di-ignore git)
     nasabah.csv, setoran.csv, penarikan.csv, counters.properties, sampah.csv
-  struk/               (dibuat otomatis, bukti transfer .txt, di-ignore git)
+  struk/               (dibuat otomatis, bukti transfer struk digital .html, di-ignore git)
   bin/                 (hasil kompilasi)
   src/
     Main.java
@@ -69,7 +69,7 @@ java -cp bin Main --cli                # CLI
 
 `--release 8` dipakai agar kompatibel bila runtime Java 8 (menghindari `UnsupportedClassVersionError`).
 
-Web server memakai `com.sun.net.httpserver` (bawaan JDK, tanpa library eksternal). Jalankan perintah dari folder `project/` agar folder `web/`, `data/`, dan `struk/` terbaca. UI ada di `web/index.html`, `web/styles.css`, dan `web/app.js`; API di `src/web/WebServer.java`. Semua fitur GUI tersedia di web, termasuk unduh struk dan ekspor CSV.
+Web server memakai `com.sun.net.httpserver` (bawaan JDK, tanpa library eksternal). Jalankan perintah dari folder `project/` agar folder `web/`, `data/`, dan `struk/` terbaca. UI ada di `web/index.html`, `web/styles.css`, dan `web/app.js`; API di `src/web/WebServer.java`. Semua fitur GUI tersedia di web, termasuk melihat struk digital HTML dan ekspor CSV.
 
 ---
 
@@ -77,7 +77,7 @@ Web server memakai `com.sun.net.httpserver` (bawaan JDK, tanpa library eksternal
 
 1. **Tambah Nasabah**: Budi, alamat, HP, BCA, 1234567890 → `N001`, tujuan transfer tercatat.
 2. **Setor Sampah**: `N001`, Plastik, 12 kg → nilai Rp50.400 (bonus 5%), saldo Rp50.400.
-3. **Pencairan/Transfer**: `N001`, Rp20.000, konfirmasi → sukses, Ref `TRF001`, saldo Rp30.400, **struk tersimpan** di `struk/Struk_TRF001.txt`.
+3. **Pencairan/Transfer**: `N001`, Rp20.000, konfirmasi → sukses, Ref `TRF001`, saldo Rp30.400, **struk digital tersimpan** di `struk/Struk_TRF001.html` (dapat dibuka/dicetak lewat browser).
 4. **Pencairan > saldo**: ditolak (saldo tidak cukup).
 5. **Riwayat**: filter/cari, tampil setoran & transfer (tujuan + Ref), ekspor CSV.
 6. **Dashboard/Laporan**: ringkasan & rekap kategori, ekspor laporan CSV.
@@ -89,5 +89,5 @@ Web server memakai `com.sun.net.httpserver` (bawaan JDK, tanpa library eksternal
 
 - Nama, Bank/E-Wallet, No. Rekening wajib; No. HP (jika diisi) & No. Rekening harus **angka**.
 - Berat & jumlah pencairan > 0; pencairan tidak boleh melebihi saldo (saldo tidak pernah negatif).
-- Pencairan = **transfer digital (simulasi)** ke rekening/e-wallet terdaftar dengan **No. Referensi unik** + struk bukti.
-- **Persistensi otomatis**: data & jenis sampah di `data/`, struk di `struk/` (keduanya di-ignore git). Tanpa library eksternal (JDK standar).
+- Pencairan = **transfer digital (simulasi)** ke rekening/e-wallet terdaftar dengan **No. Referensi unik** + struk digital HTML (bisa dicetak/disimpan sebagai PDF dari browser).
+- **Persistensi otomatis**: data & jenis sampah di `data/`, struk digital HTML di `struk/` (keduanya di-ignore git). Tanpa library eksternal (JDK standar).

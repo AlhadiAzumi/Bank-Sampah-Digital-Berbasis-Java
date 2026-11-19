@@ -1149,10 +1149,24 @@ a {
     color: var(--sky-blue);
     font-weight: 700;
     font-size: 12px;
+    background: transparent;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+    font-family: inherit;
 }
 
 .link-btn:hover {
     text-decoration: underline;
+}
+
+.struk-frame {
+    display: block;
+    width: 100%;
+    height: min(420px, 52vh);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: #f8fafc;
 }
 
 /* ================= FORMS ================= */

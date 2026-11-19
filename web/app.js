@@ -145,6 +145,38 @@ function closeModal() {
     modalExtra   = null;
 }
 
+function notifikasiSukses(options) {
+    openModal(Object.assign({
+        icon: 'success',
+        confirmText: 'Selesai',
+        cancelText: false
+    }, options));
+}
+
+async function lihatStruk(url) {
+    openModal({
+        icon: 'receipt',
+        title: 'Struk Digital',
+        subtitle: 'Bukti transaksi pencairan dana TrashChain.',
+        body: '<iframe class="struk-frame" title="Struk Digital" loading="lazy"></iframe>',
+        confirmText: 'Tutup',
+        cancelText: false,
+        extraText: 'Buka di Tab Baru',
+        extraClass: 'btn-ghost',
+        onExtra: () => { window.open(url, '_blank', 'noopener'); }
+    });
+    try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('Struk tidak ditemukan. Jalankan ulang server setelah update.');
+        const html = await response.text();
+        const frame = $('#modalBody .struk-frame');
+        if (frame) frame.srcdoc = html;
+    } catch (e) {
+        if (!$('#modal').hidden) closeModal();
+        toast(e.message, true);
+    }
+}
+
 $('#modalClose').addEventListener('click', closeModal);
 $('#modal').addEventListener('click', (e) => { if (e.target === $('#modal')) closeModal(); });
 $('#modalNo').addEventListener('click', closeModal);
@@ -171,7 +203,7 @@ function buildResultCard(rows) {
         '</div></div>';
 }
 
-function buildReceiptCard(ref, waktu, nasabah, tujuan, jumlah, saldoSisa, refUrl) {
+function buildReceiptCard(ref, waktu, nasabah, tujuan, jumlah, saldoSisa) {
     return '<div class="digital-receipt-modal">' +
         '<div class="receipt-modal-head">' +
         '<div class="receipt-modal-badge"><svg style="width:14px;height:14px;"><use href="#i-check"/></svg>Transfer Berhasil</div>' +
@@ -406,7 +438,7 @@ async function loadRiwayat() {
             '<tr><td class="muted">' + esc(t.waktu) + '</td><td><span class="badge-code">' + esc(t.id) + '</span></td><td><strong>' + esc(t.namaNasabah) +
             '</strong></td><td><span class="tag ' + (t.tipe === 'Setoran' ? 'in' : 'out') + '">' + esc(t.tipe) +
             '</span></td><td class="muted">' + esc(t.deskripsi) + '</td><td class="num font-bold">' + rupiah(t.jumlah) +
-            '</td><td>' + (t.struk ? '<a class="link-btn" href="' + esc(t.struk) + '" target="_blank" rel="noopener">Unduh Struk</a>' : '-') +
+            '</td><td>' + (t.struk ? '<button type="button" class="link-btn" data-struk="' + esc(t.struk) + '">Lihat Struk</button>' : '-') +
             '</td></tr>'));
 }
 
@@ -437,6 +469,14 @@ function renderLaporan(l) {
 $$('.nav-item').forEach((item) => item.addEventListener('click', () => go(item.dataset.page)));
 $$('[data-go]').forEach((item) => item.addEventListener('click', () => go(item.dataset.go)));
 $('#refreshBtn').addEventListener('click', () => loadPage(state.page));
+
+const tabelRiwayat = $('#riwayatTable');
+if (tabelRiwayat) {
+    tabelRiwayat.addEventListener('click', (event) => {
+        const tombol = event.target.closest('[data-struk]');
+        if (tombol) lihatStruk(tombol.dataset.struk);
+    });
+}
 
 if ($('#todayChip')) {
     $('#todayChip').textContent = new Intl.DateTimeFormat('id-ID', {
@@ -484,10 +524,19 @@ $('#searchNasabah').addEventListener('input', renderNasabah);
 $('#formNasabah').addEventListener('submit', async (event) => {
     event.preventDefault();
     try {
-        await post('/api/nasabah', Object.fromEntries(new FormData(event.target)));
+        const hasil = await post('/api/nasabah', Object.fromEntries(new FormData(event.target)));
         event.target.reset();
         event.target.classList.add('hidden');
-        toast('Data nasabah berhasil ditambahkan.');
+        notifikasiSukses({
+            title: 'Nasabah Berhasil Ditambahkan',
+            subtitle: 'Data nasabah tersimpan otomatis dan siap digunakan.',
+            body: buildResultCard([
+                ['ID Nasabah', hasil.nasabah.id, 'lime'],
+                ['Nama Nasabah', hasil.nasabah.nama],
+                ['Tujuan Transfer', hasil.nasabah.tujuanTransfer, 'blue'],
+                ['Saldo Awal', rupiah(hasil.nasabah.saldo)]
+            ])
+        });
         loadPage('nasabah');
     } catch (e) {
         toast(e.message, true);
@@ -504,7 +553,17 @@ $('#formSetor').addEventListener('submit', async (event) => {
         const hasil = await post('/api/setoran', Object.fromEntries(new FormData(event.target)));
         $('#setorBerat').value = '';
         updateEstimate();
-        toast('Setoran ' + hasil.nama + ' berhasil dicatat (' + rupiah(hasil.jumlah) + '). Saldo baru: ' + rupiah(hasil.saldo) + '.');
+        notifikasiSukses({
+            title: 'Setoran Berhasil Dicatat',
+            subtitle: 'Nilai setoran dihitung otomatis dan saldo nasabah langsung diperbarui.',
+            body: buildResultCard([
+                ['ID Setoran', hasil.id, 'lime'],
+                ['Jenis Sampah', hasil.nama],
+                ['Berat', angka(hasil.berat, 2) + ' kg'],
+                ['Nilai Setoran', rupiah(hasil.jumlah), 'blue'],
+                ['Saldo Sekarang', rupiah(hasil.saldo)]
+            ])
+        });
         loadPage('setor');
     } catch (e) {
         toast(e.message, true);
@@ -531,13 +590,14 @@ $('#formPencairan').addEventListener('submit', (event) => {
             try {
                 const hasil = await post('/api/pencairan', { idNasabah: id, jumlah: jumlah });
                 $('#tarikJumlah').value = '';
-                const bukti = hasil.struk ? '<p style="margin-top:12px;">Struk Bukti: <a href="' + esc(hasil.struk) + '" target="_blank" rel="noopener">Unduh File Struk Transfer (.txt)</a></p>' : '';
-                openModal({
+                notifikasiSukses({
                     title: 'Pencairan Berhasil Diproses',
-                    body: '<p>Nomor Referensi: <strong>' + esc(hasil.ref) + '</strong><br>Nominal: ' + rupiah(hasil.jumlah) +
-                        '<br>Tujuan: ' + esc(hasil.tujuan) + '<br>Sisa Saldo Nasabah: ' + rupiah(hasil.saldoSisa) + '</p>' + bukti,
-                    confirmText: 'Selesai',
-                    cancelText: false
+                    subtitle: 'Transfer digital tercatat dengan nomor referensi unik.',
+                    body: buildReceiptCard(hasil.ref, hasil.waktu, hasil.nama, hasil.tujuan,
+                        rupiah(hasil.jumlah), rupiah(hasil.saldoSisa)),
+                    extraText: hasil.struk ? 'Lihat Struk Digital' : false,
+                    extraClass: 'btn-ghost',
+                    onExtra: () => { if (hasil.struk) window.open(hasil.struk, '_blank', 'noopener'); }
                 });
                 loadPage('pencairan');
             } catch (e) {
@@ -560,9 +620,18 @@ if ($('#filterCari')) {
 $('#formJenis').addEventListener('submit', async (event) => {
     event.preventDefault();
     try {
-        await post('/api/sampah', Object.fromEntries(new FormData(event.target)));
+        const hasil = await post('/api/sampah', Object.fromEntries(new FormData(event.target)));
         event.target.reset();
-        toast('Jenis sampah berhasil ditambahkan.');
+        notifikasiSukses({
+            title: 'Jenis Sampah Ditambahkan',
+            subtitle: 'Tarif baru langsung dipakai untuk perhitungan setoran.',
+            body: buildResultCard([
+                ['Nama Jenis', hasil.sampah.nama, 'lime'],
+                ['Tarif per Kg', rupiah(hasil.sampah.hargaPerKg) + ' / kg', 'blue'],
+                ['Kategori', hasil.sampah.kategori],
+                ['Aturan Perhitungan', hasil.sampah.aturanLabel]
+            ])
+        });
         loadPage('jenis');
     } catch (e) {
         toast(e.message, true);
@@ -572,9 +641,20 @@ $('#formJenis').addEventListener('submit', async (event) => {
 $('#formHarga').addEventListener('submit', async (event) => {
     event.preventDefault();
     try {
-        await post('/api/sampah/harga', Object.fromEntries(new FormData(event.target)));
+        const nilaiForm = Object.fromEntries(new FormData(event.target));
+        const lama = (state.sampah.find((s) => s.nama === nilaiForm.nama) || {}).hargaPerKg;
+        const hasil = await post('/api/sampah/harga', nilaiForm);
         event.target.reset();
-        toast('Tarif jenis sampah berhasil diperbarui.');
+        notifikasiSukses({
+            title: 'Tarif Berhasil Diperbarui',
+            subtitle: 'Perubahan harga tersimpan dan langsung berlaku.',
+            body: buildResultCard([
+                ['Jenis Sampah', hasil.sampah.nama],
+                ['Tarif Sebelumnya', rupiah(lama || 0)],
+                ['Tarif Baru', rupiah(hasil.sampah.hargaPerKg), 'lime'],
+                ['Kategori', hasil.sampah.kategori]
+            ])
+        });
         loadPage('jenis');
     } catch (e) {
         toast(e.message, true);
