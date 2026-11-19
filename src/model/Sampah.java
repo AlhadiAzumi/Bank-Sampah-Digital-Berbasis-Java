@@ -32,6 +32,10 @@ public abstract class Sampah {
 
     public abstract String getKategori();
 
+    public String getAturanDeskripsi() {
+        return "Normal";
+    }
+
     protected void validasiBerat(double beratKg) {
         if (beratKg <= 0) {
             throw new IllegalArgumentException("Berat sampah harus lebih dari 0 kg.");

@@ -18,7 +18,7 @@ public class BankSampahCLI {
     public static void main(String[] args) {
         boolean berjalan = true;
 
-        System.out.println("Selamat datang di Bank Sampah Digital");
+        System.out.println("Selamat datang di TrashChain");
 
         while (berjalan) {
             tampilkanMenu();
@@ -46,7 +46,7 @@ public class BankSampahCLI {
                     break;
                 case 7:
                     berjalan = false;
-                    System.out.println("Terima kasih telah menggunakan Bank Sampah Digital.");
+                    System.out.println("Terima kasih telah menggunakan TrashChain.");
                     break;
                 default:
                     System.out.println("Pilihan tidak valid. Silakan pilih 1-7.");

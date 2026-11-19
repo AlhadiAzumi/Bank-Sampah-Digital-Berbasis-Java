@@ -16,4 +16,9 @@ public class Logam extends Sampah {
     public String getKategori() {
         return "Anorganik - Logam";
     }
+
+    @Override
+    public String getAturanDeskripsi() {
+        return "Bonus 5%";
+    }
 }

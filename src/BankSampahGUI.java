@@ -46,7 +46,6 @@ import javax.swing.table.TableRowSorter;
 import model.Nasabah;
 import model.Penarikan;
 import model.Sampah;
-import model.SampahKustom;
 import model.Setoran;
 import model.Transaksi;
 import service.BankSampah;
@@ -92,7 +91,7 @@ public class BankSampahGUI extends JFrame {
     private JLabel dashDicairkanVal;
 
     public BankSampahGUI() {
-        setTitle("Bank Sampah Digital");
+        setTitle("TrashChain");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setSize(1120, 760);
         setLocationRelativeTo(null);
@@ -124,7 +123,7 @@ public class BankSampahGUI extends JFrame {
         header.setOpaque(true);
         header.setBorder(BorderFactory.createEmptyBorder(16, 20, 16, 20));
 
-        JLabel title = new JLabel("Bank Sampah Digital");
+        JLabel title = new JLabel("TrashChain");
         title.setFont(new Font("SansSerif", Font.BOLD, 24));
         title.setForeground(Color.WHITE);
 
@@ -752,14 +751,7 @@ public class BankSampahGUI extends JFrame {
         if (sampahTableModel != null) {
             sampahTableModel.setRowCount(0);
             for (Sampah s : bank.getDaftarSampah()) {
-                String aturan = "Normal";
-                if (s instanceof SampahKustom) {
-                    String a = ((SampahKustom) s).getAturan();
-                    if ("BONUS5".equals(a)) aturan = "Bonus 5%";
-                    else if ("BONUS5_MIN10".equals(a)) aturan = "Bonus 5% (min 10kg)";
-                } else if (s.getNama().equalsIgnoreCase("Plastik")) aturan = "Bonus 5% (min 10kg)";
-                else if (s.getNama().equalsIgnoreCase("Logam")) aturan = "Bonus 5%";
-                sampahTableModel.addRow(new Object[]{s.getNama(), Format.rupiah(s.getHargaPerKg()), s.getKategori(), aturan});
+                sampahTableModel.addRow(new Object[]{s.getNama(), Format.rupiah(s.getHargaPerKg()), s.getKategori(), s.getAturanDeskripsi()});
             }
         }
     }
@@ -870,7 +862,7 @@ public class BankSampahGUI extends JFrame {
 
         StringBuilder sb = new StringBuilder();
         sb.append("<html><body style='font-family:sans-serif;'>");
-        sb.append("<h2>Laporan Bank Sampah Digital</h2>");
+        sb.append("<h2>Laporan TrashChain</h2>");
         sb.append("<p style='color:#2e7d32'><b>Pencairan = transfer digital (bukan tunai) + No. Referensi + struk di folder struk/.</b></p>");
         sb.append("<table cellspacing='6'>");
         row(sb, "Jumlah nasabah", String.valueOf(bank.getDaftarNasabah().size()));

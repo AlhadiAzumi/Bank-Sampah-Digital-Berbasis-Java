@@ -38,4 +38,11 @@ public class SampahKustom extends Sampah {
     public String getKategori() {
         return kategori;
     }
+
+    @Override
+    public String getAturanDeskripsi() {
+        if ("BONUS5".equals(aturan)) return "Bonus 5%";
+        if ("BONUS5_MIN10".equals(aturan)) return "Bonus 5% (min 10kg)";
+        return "Normal";
+    }
 }

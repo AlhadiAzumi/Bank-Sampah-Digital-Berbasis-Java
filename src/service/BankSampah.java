@@ -15,12 +15,16 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import model.Elektronik;
+import model.Kaca;
+import model.Karet;
 import model.Kertas;
 import model.Logam;
 import model.Nasabah;
 import model.Organik;
 import model.Penarikan;
 import model.Plastik;
+import model.Tekstil;
 import model.Sampah;
 import model.SampahKustom;
 import model.Setoran;
@@ -59,6 +63,10 @@ public class BankSampah {
         daftarSampah.add(new Kertas(2500));
         daftarSampah.add(new Logam(12000));
         daftarSampah.add(new Organik(1000));
+        daftarSampah.add(new Kaca(800));
+        daftarSampah.add(new Elektronik(6000));
+        daftarSampah.add(new Tekstil(1500));
+        daftarSampah.add(new Karet(2000));
     }
 
     private void muatAtauSeedSampah() {
@@ -454,6 +462,10 @@ public class BankSampah {
                 else if (s instanceof Kertas) { tipe = "KERTAS"; aturan = "NORMAL"; kategori = s.getKategori(); }
                 else if (s instanceof Logam) { tipe = "LOGAM"; aturan = "BONUS5"; kategori = s.getKategori(); }
                 else if (s instanceof Organik) { tipe = "ORGANIK"; aturan = "NORMAL"; kategori = s.getKategori(); }
+                else if (s instanceof Kaca) { tipe = "KACA"; aturan = "NORMAL"; kategori = s.getKategori(); }
+                else if (s instanceof Elektronik) { tipe = "ELEKTRONIK"; aturan = "BONUS5_MIN5"; kategori = s.getKategori(); }
+                else if (s instanceof Tekstil) { tipe = "TEKSTIL"; aturan = "NORMAL"; kategori = s.getKategori(); }
+                else if (s instanceof Karet) { tipe = "KARET"; aturan = "BONUS5"; kategori = s.getKategori(); }
                 else if (s instanceof SampahKustom) { tipe = "KUSTOM"; aturan = ((SampahKustom) s).getAturan(); kategori = s.getKategori(); }
                 writer.write(String.join("|",
                         esc(s.getNama()),
@@ -486,6 +498,10 @@ public class BankSampah {
                     else if ("KERTAS".equals(tipe)) s = new Kertas(harga);
                     else if ("LOGAM".equals(tipe)) s = new Logam(harga);
                     else if ("ORGANIK".equals(tipe)) s = new Organik(harga);
+                    else if ("KACA".equals(tipe)) s = new Kaca(harga);
+                    else if ("ELEKTRONIK".equals(tipe)) s = new Elektronik(harga);
+                    else if ("TEKSTIL".equals(tipe)) s = new Tekstil(harga);
+                    else if ("KARET".equals(tipe)) s = new Karet(harga);
                     else s = new SampahKustom(nama, harga, kategori, aturan);
                     if (s != null) daftarSampah.add(s);
                 } catch (Exception ignored) {

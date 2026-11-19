@@ -20,4 +20,9 @@ public class Plastik extends Sampah {
     public String getKategori() {
         return "Anorganik - Plastik";
     }
+
+    @Override
+    public String getAturanDeskripsi() {
+        return "Bonus 5% (min 10kg)";
+    }
 }

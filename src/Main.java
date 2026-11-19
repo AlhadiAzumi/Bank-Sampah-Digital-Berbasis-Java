@@ -5,6 +5,10 @@ public class Main {
             BankSampahCLI.main(args);
             return;
         }
+        if (args.length > 0 && "--web".equalsIgnoreCase(args[0])) {
+            web.WebServer.launch(args);
+            return;
+        }
         BankSampahGUI.launch();
     }
 }
