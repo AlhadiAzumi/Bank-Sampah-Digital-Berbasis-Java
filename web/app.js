@@ -334,8 +334,18 @@ function buildReceiptCard(ref, waktu, nasabah, tujuan, jumlah, saldoSisa) {
         '</div>';
 }
 
+function tutupMenuMobile() {
+    const menu = $('#navLinks');
+    const toggle = $('#navToggle');
+    if (!menu || !toggle) return;
+    menu.classList.remove('is-open');
+    toggle.setAttribute('aria-expanded', 'false');
+    toggle.setAttribute('aria-label', 'Buka Menu');
+}
+
 function go(page) {
     if (!judul[page]) return;
+    tutupMenuMobile();
     state.page = page;
     $$('.nav-item').forEach((item) => item.classList.toggle('active', item.dataset.page === page));
     $$('.page').forEach((section) => section.classList.toggle('active', section.id === 'page-' + page));
@@ -403,6 +413,9 @@ function table(element, headers, rows) {
     element.innerHTML = '<thead><tr>' + headers.map((h) => '<th>' + esc(h) + '</th>').join('') +
         '</tr></thead><tbody>' + (rows.length ? rows.join('') :
         '<tr><td class="empty" colspan="' + headers.length + '">Belum ada data tersedia.</td></tr>') + '</tbody>';
+    element.querySelectorAll('tbody tr').forEach((tr) => tr.querySelectorAll('td').forEach((td, i) => {
+        if (td.colSpan === 1 && headers[i]) td.dataset.label = headers[i];
+    }));
 }
 
 function metric(label, value, note) {
@@ -588,6 +601,24 @@ $$('.nav-item').forEach((item) => item.addEventListener('click', () => go(item.d
 $$('[data-go]').forEach((item) => item.addEventListener('click', () => go(item.dataset.go)));
 $('#refreshBtn').addEventListener('click', () => loadPage(state.page));
 
+const navToggle = $('#navToggle');
+if (navToggle) {
+    navToggle.addEventListener('click', (event) => {
+        event.stopPropagation();
+        const menu = $('#navLinks');
+        const buka = !menu.classList.contains('is-open');
+        menu.classList.toggle('is-open', buka);
+        navToggle.setAttribute('aria-expanded', String(buka));
+        navToggle.setAttribute('aria-label', buka ? 'Tutup Menu' : 'Buka Menu');
+    });
+    document.addEventListener('click', (event) => {
+        if (!event.target.closest('.navbar-container')) tutupMenuMobile();
+    });
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') tutupMenuMobile();
+    });
+}
+
 const tabelRiwayat = $('#riwayatTable');
 if (tabelRiwayat) {
     tabelRiwayat.addEventListener('click', (event) => {
@@ -601,37 +632,6 @@ if ($('#todayChip')) {
         weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
     }).format(new Date());
 }
-
-// Quick Search & Shortcut (Ctrl/Cmd + K)
-const pintasan = {
-    dashboard: 'dashboard', beranda: 'dashboard', home: 'dashboard',
-    nasabah: 'nasabah', user: 'nasabah', warga: 'nasabah',
-    setor: 'setor', setoran: 'setor', sampah: 'setor',
-    pencairan: 'pencairan', cair: 'pencairan', transfer: 'pencairan', tarik: 'pencairan',
-    riwayat: 'riwayat', history: 'riwayat', transaksi: 'riwayat',
-    jenis: 'jenis', harga: 'jenis', tarif: 'jenis',
-    laporan: 'laporan', lapor: 'laporan', rekap: 'laporan'
-};
-
-$('#globalSearch').addEventListener('keydown', (event) => {
-    if (event.key !== 'Enter') return;
-    const cari = event.target.value.trim().toLowerCase();
-    if (!cari) return;
-    const cocok = Object.keys(pintasan).find((kata) => kata.includes(cari));
-    if (cocok) {
-        go(pintasan[cocok]);
-        event.target.value = '';
-    } else {
-        toast('Menu tidak ditemukan. Coba: nasabah, setor, riwayat, laporan.', true);
-    }
-});
-
-document.addEventListener('keydown', (event) => {
-    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
-        event.preventDefault();
-        $('#globalSearch').focus();
-    }
-});
 
 // Nasabah Form Handlers
 $('#toggleNasabahForm').addEventListener('click', () => $('#formNasabah').classList.toggle('hidden'));
